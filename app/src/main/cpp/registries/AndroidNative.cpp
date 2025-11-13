@@ -42,4 +42,23 @@ void android_native_toast(VM& vm, const uint8_t argc) {
     vm.stack_manager.push(Value::createNIL());
 }
 
+
+void android_create_button(VM& vm, const uint8_t argc) {
+    if(argc < 2) return; // title and callback
+    Value title = vm.stack_manager.peek(0);
+    Value callback = vm.stack_manager.peek(1);
+
+    JNIEnv* env;
+    droplet_java_vm->AttachCurrentThread(&env, nullptr);
+
+    jclass cls = env->GetObjectClass(droplet_activity);
+    jmethodID method = env->GetStaticMethodID(cls, "createButton", "(Ljava/lang/String;I)V");
+
+    jstring jtitle = env->NewStringUTF(title.toString().c_str());
+    env->CallStaticVoidMethod(cls, method, jtitle, 1);
+    env->DeleteLocalRef(jtitle);
+
+    vm.stack_manager.push(Value::createNIL());
+}
+
 #endif
