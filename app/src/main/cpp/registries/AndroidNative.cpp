@@ -264,25 +264,28 @@ void android_create_textview(VM& vm, const uint8_t argc) {
 
 // Create ImageView: args: (pathOrUrl, parentId_opt, width, height)
 void android_create_imageview(VM& vm, const uint8_t argc) {
-    if (argc < 1) {
-        for (int i = 0; i < argc; i++) vm.stack_manager.pop();
-        vm.stack_manager.push(Value::createNIL());
-        return;
-    }
-
-    Value pathVal = vm.stack_manager.pop();
+    // Expected args: pathOrUrl, parentId_opt, width, height
+    std::string path = "";
     int parentId = -1, width = -1, height = -1;
-    if (argc >= 2) {
-        Value p = vm.stack_manager.pop(); parentId = (p.type == ValueType::INT) ? p.current_value.i : -1;
+
+    // Pop in reverse order (last arg first)
+    if (argc >= 4) {
+        Value h = vm.stack_manager.pop();
+        if (h.type == ValueType::INT) height = h.current_value.i;
     }
     if (argc >= 3) {
-        Value w = vm.stack_manager.pop(); width = (w.type == ValueType::INT) ? w.current_value.i : -1;
+        Value w = vm.stack_manager.pop();
+        if (w.type == ValueType::INT) width = w.current_value.i;
     }
-    if (argc >= 4) {
-        Value h = vm.stack_manager.pop(); height = (h.type == ValueType::INT) ? h.current_value.i : -1;
+    if (argc >= 2) {
+        Value p = vm.stack_manager.pop();
+        if (p.type == ValueType::INT) parentId = p.current_value.i;
+    }
+    if (argc >= 1) {
+        Value pathVal = vm.stack_manager.pop();
+        path = pathVal.toString();
     }
 
-    std::string path = pathVal.toString();
     int viewId = g_next_view_id++;
 
     JNIEnv* env;
@@ -290,6 +293,7 @@ void android_create_imageview(VM& vm, const uint8_t argc) {
 
     jclass cls = env->GetObjectClass(droplet_activity);
     jmethodID method = env->GetMethodID(cls, "createImageView", "(Ljava/lang/String;IIII)V");
+
     jstring jpath = env->NewStringUTF(path.c_str());
     env->CallVoidMethod(droplet_activity, method, jpath, viewId, parentId, width, height);
     env->DeleteLocalRef(jpath);
