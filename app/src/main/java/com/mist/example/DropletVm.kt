@@ -8,4 +8,5 @@ class DropletVM {
     }
 
     external fun runBytecode(path: String)
+    external fun cleanup()
 }
