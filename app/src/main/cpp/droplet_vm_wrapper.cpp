@@ -1,0 +1,29 @@
+#include "droplet/vm/VM.h"
+#include "droplet/vm/Loader.h"
+#include "droplet/native/Native.h"
+#include <string>
+#include <android/log.h>
+
+class DropletVMWrapper {
+public:
+    void runBytecode(const std::string &bytecodePath) {
+        VM vm;
+        Loader loader;
+
+        register_native_functions(vm);  // register your FFI functions
+
+        if (!loader.load_dbc_file(bytecodePath, vm)) {
+            __android_log_print(ANDROID_LOG_ERROR, "Droplet", "Failed to load %s", bytecodePath.c_str());
+            return;
+        }
+
+        uint32_t mainIdx = vm.get_function_index("main");
+        if (mainIdx == UINT32_MAX) {
+            __android_log_print(ANDROID_LOG_ERROR, "Droplet", "No main function found");
+            return;
+        }
+
+        vm.call_function_by_index(mainIdx, 0);
+        vm.run();
+    }
+};

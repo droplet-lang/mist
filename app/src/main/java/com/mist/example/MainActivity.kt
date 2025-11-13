@@ -7,28 +7,18 @@ import com.mist.example.databinding.ActivityMainBinding
 
 class MainActivity : AppCompatActivity() {
 
-    private lateinit var binding: ActivityMainBinding
+    private val dropletVM = DropletVM()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        binding = ActivityMainBinding.inflate(layoutInflater)
-        setContentView(binding.root)
-
-        // Example of a call to a native method
-        binding.sampleText.text = stringFromJNI()
-    }
-
-    /**
-     * A native method that is implemented by the 'example' native library,
-     * which is packaged with this application.
-     */
-    external fun stringFromJNI(): String
-
-    companion object {
-        // Used to load the 'example' library on application startup.
-        init {
-            System.loadLibrary("example")
+        // Load bytecode from assets
+        val assetFile = "hello.dbc"
+        val file = filesDir.resolve(assetFile)
+        assets.open(assetFile).use { input ->
+            file.outputStream().use { output -> input.copyTo(output) }
         }
+
+        dropletVM.runBytecode(file.absolutePath)
     }
 }
