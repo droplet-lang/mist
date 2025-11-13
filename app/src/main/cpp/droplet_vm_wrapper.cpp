@@ -10,7 +10,7 @@ public:
         VM vm;
         Loader loader;
 
-        register_native_functions(vm);  // register your FFI functions
+        register_native_functions(vm);
 
         if (!loader.load_dbc_file(bytecodePath, vm)) {
             __android_log_print(ANDROID_LOG_ERROR, "Droplet", "Failed to load %s", bytecodePath.c_str());

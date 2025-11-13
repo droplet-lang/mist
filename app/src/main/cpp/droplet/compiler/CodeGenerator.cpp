@@ -1100,7 +1100,7 @@ bool CodeGenerator::isBuiltinFunction(const std::string& name) {
     static const std::vector<std::string> builtins = {
         "println", "print", "input", "str", "int", "float", "exit",
         "len", "push", "pop", "get", "set", "has", "del",
-        "keys", "values", "substr", "charAt", "concat"
+        "keys", "values", "substr", "charAt", "concat", "android_native_toast"
     };
 
     for (const auto& builtin : builtins) {

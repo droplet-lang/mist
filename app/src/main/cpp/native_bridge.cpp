@@ -8,7 +8,7 @@ extern "C" {
         const char *bytecodePath = env->GetStringUTFChars(path, nullptr);
 
         DropletVMWrapper vm;
-        vm.runBytecode(bytecodePath);  // wrapper that runs your VM
+        vm.runBytecode(bytecodePath);
 
         env->ReleaseStringUTFChars(path, bytecodePath);
     }

@@ -223,6 +223,14 @@ void TypeChecker::registerBuiltins() const {
         globalScope->define(symbol);
     }
 
+    // android_native_toast(...) -> void
+    {
+        auto funcType = std::make_shared<Type>(Type::Kind::FUNCTION);
+        funcType->returnType = Type::Void();
+        Symbol symbol(Symbol::Kind::FUNCTION, "android_native_toast", funcType);
+        globalScope->define(symbol);
+    }
+
     // str(value) -> str
     {
         auto funcType = std::make_shared<Type>(Type::Kind::FUNCTION);
@@ -1250,7 +1258,8 @@ std::shared_ptr<Type> TypeChecker::checkCall(const CallExpr *expr) {
             id->name == "len" ||
             id->name == "int" ||
             id->name == "float" ||
-            id->name == "input"
+            id->name == "input" ||
+            id->name == "android_native_toast"
         ) {
             for (auto &arg: expr->arguments) checkExpr(arg.get());
             return Type::Void();
