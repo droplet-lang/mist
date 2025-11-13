@@ -10,11 +10,13 @@ include_directories(
         droplet/src/compiler
         droplet/src/debugger
         droplet/src/native
+        registries/
 #        droplet/src/external/dlfcn
 )
 
 # Gather all Droplet source files and Android bridge
 file(GLOB_RECURSE DROPLET_SOURCES
+        registries/*.cpp
         droplet/src/**/*.cpp
         droplet/src/**/*.c
         native_bridge.cpp

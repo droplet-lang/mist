@@ -1,6 +1,9 @@
 #include "droplet/src/vm/VM.h"
 #include "droplet/src/vm/Loader.h"
 #include "droplet/src/native/Native.h"
+#include "droplet/src/native/NativeRegisteries.h"
+#include "registries/AndroidNative.h"
+#include "registries/AndroidRegistries.h"
 #include <string>
 #include <android/log.h>
 
@@ -10,7 +13,11 @@ public:
         VM vm;
         Loader loader;
 
+        initCoreBuiltins();
+        initAndroidBuiltins();
+
         register_native_functions(vm);
+        register_android_native_functions(vm);
 
         if (!loader.load_dbc_file(bytecodePath, vm)) {
             __android_log_print(ANDROID_LOG_ERROR, "Droplet", "Failed to load %s", bytecodePath.c_str());
