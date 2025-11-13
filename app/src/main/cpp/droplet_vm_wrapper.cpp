@@ -1,6 +1,6 @@
-#include "droplet/vm/VM.h"
-#include "droplet/vm/Loader.h"
-#include "droplet/native/Native.h"
+#include "droplet/src/vm/VM.h"
+#include "droplet/src/vm/Loader.h"
+#include "droplet/src/native/Native.h"
 #include <string>
 #include <android/log.h>
 

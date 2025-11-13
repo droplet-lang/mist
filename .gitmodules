@@ -1,0 +1,3 @@
+[submodule "app/src/main/cpp/droplet"]
+	path = app/src/main/cpp/droplet
+	url = https://github.com/droplet-lang/lang.git
