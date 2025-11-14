@@ -1,29 +1,43 @@
 package com.mist.example
 
 import android.os.Bundle
+import android.view.MenuItem
 import android.view.View
 import android.view.ViewGroup
 import android.widget.*
 import androidx.appcompat.app.AppCompatActivity
+import androidx.appcompat.widget.Toolbar
 import androidx.cardview.widget.CardView
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import androidx.recyclerview.widget.GridLayoutManager
 import android.graphics.BitmapFactory
-import android.graphics.Color
 import android.util.TypedValue
+import android.util.Log
 import java.io.File
 import java.io.InputStream
 import java.net.URL
 import java.net.HttpURLConnection
 import java.util.concurrent.Executors
+import java.util.Stack
 
 class MainActivity : AppCompatActivity() {
-    private lateinit var container: LinearLayout
+    private lateinit var toolbar: Toolbar
+    private lateinit var contentFrame: FrameLayout
     private val viewMap = HashMap<Int, View>()
+    private val screenMap = HashMap<Int, ScreenInfo>()
     private val recyclerAdapters = HashMap<Int, SimpleRecyclerAdapter>()
+    private val navigationStack = Stack<Int>()
+    private var currentScreenId: Int = -1
+
+    data class ScreenInfo(
+        val id: Int,
+        val name: String,
+        val container: LinearLayout
+    )
 
     companion object {
+        private const val TAG = "MainActivity"
         init {
             System.loadLibrary("droplet_native")
         }
@@ -31,12 +45,32 @@ class MainActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        setContentView(R.layout.activity_main)
 
-        container = LinearLayout(this).apply {
+        // Setup toolbar
+        toolbar = findViewById(R.id.toolbar)
+        setSupportActionBar(toolbar)
+        supportActionBar?.setDisplayHomeAsUpEnabled(false)
+        supportActionBar?.title = "Droplet App"
+
+        // Setup content frame
+        contentFrame = findViewById(R.id.content_frame)
+
+        // Create default screen
+        val defaultContainer = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
+            layoutParams = FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                FrameLayout.LayoutParams.MATCH_PARENT
+            )
             setPadding(16, 16, 16, 16)
         }
-        setContentView(container)
+        contentFrame.addView(defaultContainer)
+
+        val defaultScreen = ScreenInfo(-1, "Main", defaultContainer)
+        screenMap[-1] = defaultScreen
+        viewMap[-1] = defaultContainer
+        currentScreenId = -1
 
         registerVM()
 
@@ -49,13 +83,132 @@ class MainActivity : AppCompatActivity() {
         vm.runBytecode(outFile.absolutePath)
     }
 
+    override fun onOptionsItemSelected(item: MenuItem): Boolean {
+        return when (item.itemId) {
+            android.R.id.home -> {
+                navigateBack()
+                true
+            }
+            else -> super.onOptionsItemSelected(item)
+        }
+    }
+
+    @Deprecated("Deprecated in Java")
+    override fun onBackPressed() {
+        if (navigationStack.isEmpty()) {
+            // On home screen - show toast instead of closing
+            Toast.makeText(this, "Already on home screen", Toast.LENGTH_SHORT).show()
+        } else {
+            navigateBack()
+        }
+    }
+
+    fun setToolbarTitle(title: String) {
+        runOnUiThread {
+            supportActionBar?.title = title
+        }
+    }
+
+    fun setBackButtonVisible(visible: Boolean) {
+        runOnUiThread {
+            supportActionBar?.setDisplayHomeAsUpEnabled(visible)
+        }
+    }
+
+    fun createScreen(screenId: Int, name: String) {
+        runOnUiThread {
+            Log.d(TAG, "Creating screen: id=$screenId, name=$name")
+            val container = LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL
+                layoutParams = FrameLayout.LayoutParams(
+                    FrameLayout.LayoutParams.MATCH_PARENT,
+                    FrameLayout.LayoutParams.MATCH_PARENT
+                )
+                setPadding(16, 16, 16, 16)
+                visibility = View.GONE
+            }
+            contentFrame.addView(container)
+
+            val screen = ScreenInfo(screenId, name, container)
+            screenMap[screenId] = screen
+            viewMap[screenId] = container
+            Log.d(TAG, "Screen created successfully: $screenId")
+        }
+    }
+
+    fun navigateToScreen(screenId: Int) {
+        runOnUiThread {
+            Log.d(TAG, "Navigating to screen: $screenId from $currentScreenId")
+            val screen = screenMap[screenId]
+            if (screen == null) {
+                Log.e(TAG, "Screen not found: $screenId")
+                return@runOnUiThread
+            }
+
+            // FIX: Always hide current screen, including the default screen
+            screenMap[currentScreenId]?.container?.visibility = View.GONE
+
+            // Push current screen to stack
+            navigationStack.push(currentScreenId)
+            Log.d(TAG, "Pushed $currentScreenId to stack, stack size: ${navigationStack.size}")
+
+            // Show new screen
+            screen.container.visibility = View.VISIBLE
+            currentScreenId = screenId
+
+            // Update toolbar with back button
+            supportActionBar?.title = screen.name
+            supportActionBar?.setDisplayHomeAsUpEnabled(true)
+            Log.d(TAG, "Navigation complete. Current screen: $currentScreenId, Stack: $navigationStack")
+        }
+    }
+
+    fun navigateBack() {
+        runOnUiThread {
+            Log.d(TAG, "Navigate back called. Stack size: ${navigationStack.size}")
+            if (navigationStack.isEmpty()) {
+                Log.d(TAG, "Stack empty, ignoring")
+                return@runOnUiThread
+            }
+
+            // Hide current screen
+            screenMap[currentScreenId]?.container?.visibility = View.GONE
+
+            // Show previous screen
+            val previousScreenId = navigationStack.pop()
+            currentScreenId = previousScreenId
+            val screen = screenMap[previousScreenId]
+            screen?.container?.visibility = View.VISIBLE
+
+            // Update toolbar
+            supportActionBar?.title = screen?.name ?: "Main"
+            supportActionBar?.setDisplayHomeAsUpEnabled(navigationStack.isNotEmpty())
+            Log.d(TAG, "Navigated back to: $currentScreenId, Stack size: ${navigationStack.size}")
+        }
+    }
+
+    private fun getTargetContainer(parentId: Int): ViewGroup {
+        if (parentId != -1) {
+            val parent = viewMap[parentId]
+            if (parent is ViewGroup) {
+                Log.d(TAG, "Using parent container: $parentId")
+                return parent
+            }
+            Log.w(TAG, "Parent $parentId not found or not ViewGroup, using current screen")
+        }
+
+        val container = screenMap[currentScreenId]?.container ?: screenMap[-1]!!.container
+        Log.d(TAG, "Using current screen container: $currentScreenId")
+        return container
+    }
+
     fun showToast(message: String) {
         runOnUiThread { Toast.makeText(this, message, Toast.LENGTH_SHORT).show() }
     }
 
-
     fun createButton(title: String, callbackId: Int, parentId: Int) {
         runOnUiThread {
+            Log.d(TAG, "Creating button: '$title', callback=$callbackId, parent=$parentId")
             val button = Button(this).apply {
                 text = title
                 setOnClickListener { onButtonClick(callbackId) }
@@ -67,18 +220,14 @@ class MainActivity : AppCompatActivity() {
                 }
             }
 
-            // Add to specified parent or default container
-            if (parentId != -1 && viewMap.containsKey(parentId)) {
-                val parent = viewMap[parentId] as? ViewGroup
-                parent?.addView(button)
-            } else {
-                container.addView(button)
-            }
+            getTargetContainer(parentId).addView(button)
         }
     }
 
+    // ... rest of the methods remain the same ...
     fun createTextView(text: String?, viewId: Int, parentId: Int) {
         runOnUiThread {
+            Log.d(TAG, "Creating TextView: id=$viewId, parent=$parentId, text='$text'")
             val tv = TextView(this)
             tv.text = text ?: ""
             tv.setTextSize(TypedValue.COMPLEX_UNIT_SP, 16f)
@@ -90,17 +239,13 @@ class MainActivity : AppCompatActivity() {
             tv.layoutParams = params
             viewMap[viewId] = tv
 
-            if (parentId != -1 && viewMap.containsKey(parentId)) {
-                val parent = viewMap[parentId] as? ViewGroup
-                parent?.addView(tv)
-            } else {
-                container.addView(tv)
-            }
+            getTargetContainer(parentId).addView(tv)
         }
     }
 
     fun createImageView(pathOrUrl: String?, viewId: Int, parentId: Int, width: Int, height: Int) {
         runOnUiThread {
+            Log.d(TAG, "Creating ImageView: id=$viewId, parent=$parentId")
             val iv = ImageView(this)
             val w = if (width > 0) dpToPx(width) else ViewGroup.LayoutParams.WRAP_CONTENT
             val h = if (height > 0) dpToPx(height) else ViewGroup.LayoutParams.WRAP_CONTENT
@@ -115,17 +260,13 @@ class MainActivity : AppCompatActivity() {
                 loadImageIntoView(iv, pathOrUrl)
             }
 
-            if (parentId != -1 && viewMap.containsKey(parentId)) {
-                val parent = viewMap[parentId] as? ViewGroup
-                parent?.addView(iv)
-            } else {
-                container.addView(iv)
-            }
+            getTargetContainer(parentId).addView(iv)
         }
     }
 
     fun createLinearLayout(orientation: Int, viewId: Int, parentId: Int) {
         runOnUiThread {
+            Log.d(TAG, "Creating LinearLayout: id=$viewId, parent=$parentId, orientation=$orientation")
             val layout = LinearLayout(this)
             layout.orientation = if (orientation == 1) LinearLayout.HORIZONTAL else LinearLayout.VERTICAL
             val params = LinearLayout.LayoutParams(
@@ -135,17 +276,13 @@ class MainActivity : AppCompatActivity() {
             layout.layoutParams = params
             viewMap[viewId] = layout
 
-            if (parentId != -1 && viewMap.containsKey(parentId)) {
-                val parent = viewMap[parentId] as? ViewGroup
-                parent?.addView(layout)
-            } else {
-                container.addView(layout)
-            }
+            getTargetContainer(parentId).addView(layout)
         }
     }
 
     fun createScrollView(viewId: Int, parentId: Int) {
         runOnUiThread {
+            Log.d(TAG, "Creating ScrollView: id=$viewId, parent=$parentId")
             val scrollView = ScrollView(this)
             val params = LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
@@ -153,25 +290,20 @@ class MainActivity : AppCompatActivity() {
             )
             scrollView.layoutParams = params
 
-            // Create a child container for content
             val innerLayout = LinearLayout(this)
             innerLayout.orientation = LinearLayout.VERTICAL
             scrollView.addView(innerLayout)
 
-            viewMap[viewId] = innerLayout // Store the inner layout for adding children
-            viewMap[viewId + 1000000] = scrollView // Store scrollview with offset key
+            viewMap[viewId] = innerLayout
+            viewMap[viewId + 1000000] = scrollView
 
-            if (parentId != -1 && viewMap.containsKey(parentId)) {
-                val parent = viewMap[parentId] as? ViewGroup
-                parent?.addView(scrollView)
-            } else {
-                container.addView(scrollView)
-            }
+            getTargetContainer(parentId).addView(scrollView)
         }
     }
 
     fun createCardView(viewId: Int, parentId: Int, elevation: Int, cornerRadius: Int) {
         runOnUiThread {
+            Log.d(TAG, "Creating CardView: id=$viewId, parent=$parentId")
             val cardView = CardView(this)
             val params = LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
@@ -183,20 +315,14 @@ class MainActivity : AppCompatActivity() {
             cardView.cardElevation = dpToPx(elevation).toFloat()
             cardView.setContentPadding(16, 16, 16, 16)
 
-            // Create inner layout for content
             val innerLayout = LinearLayout(this)
             innerLayout.orientation = LinearLayout.VERTICAL
             cardView.addView(innerLayout)
 
-            viewMap[viewId] = innerLayout // Store inner layout for adding children
-            viewMap[viewId + 2000000] = cardView // Store cardview with offset
+            viewMap[viewId] = innerLayout
+            viewMap[viewId + 2000000] = cardView
 
-            if (parentId != -1 && viewMap.containsKey(parentId)) {
-                val parent = viewMap[parentId] as? ViewGroup
-                parent?.addView(cardView)
-            } else {
-                container.addView(cardView)
-            }
+            getTargetContainer(parentId).addView(cardView)
         }
     }
 
@@ -209,26 +335,19 @@ class MainActivity : AppCompatActivity() {
             )
             recyclerView.layoutParams = params
 
-            // Set layout manager based on type
             recyclerView.layoutManager = when(layoutType) {
                 1 -> LinearLayoutManager(this, LinearLayoutManager.HORIZONTAL, false)
-                2 -> GridLayoutManager(this, 2) // 2 columns for grid
+                2 -> GridLayoutManager(this, 2)
                 else -> LinearLayoutManager(this, LinearLayoutManager.VERTICAL, false)
             }
 
-            // Create and set adapter
             val adapter = SimpleRecyclerAdapter()
             recyclerView.adapter = adapter
             recyclerAdapters[viewId] = adapter
 
             viewMap[viewId] = recyclerView
 
-            if (parentId != -1 && viewMap.containsKey(parentId)) {
-                val parent = viewMap[parentId] as? ViewGroup
-                parent?.addView(recyclerView)
-            } else {
-                container.addView(recyclerView)
-            }
+            getTargetContainer(parentId).addView(recyclerView)
         }
     }
 
@@ -286,8 +405,8 @@ class MainActivity : AppCompatActivity() {
     fun setViewBackgroundColor(viewId: Int, color: Int) {
         runOnUiThread {
             viewMap[viewId]?.setBackgroundColor(color)
-            viewMap[viewId + 1000000]?.setBackgroundColor(color) // For ScrollView
-//            viewMap[viewId + 2000000]?.seCard(color) // For CardView
+            viewMap[viewId + 1000000]?.setBackgroundColor(color)
+            viewMap[viewId + 2000000]?.setBackgroundColor(color)
         }
     }
 
@@ -364,7 +483,6 @@ class MainActivity : AppCompatActivity() {
     private external fun onButtonClick(callbackId: Int)
 }
 
-// Simple RecyclerView Adapter
 class SimpleRecyclerAdapter : RecyclerView.Adapter<SimpleRecyclerAdapter.ViewHolder>() {
     private val items = mutableListOf<String>()
 

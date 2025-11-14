@@ -607,4 +607,113 @@ void android_set_view_size(VM& vm, const uint8_t argc) {
     vm.stack_manager.push(Value::createNIL());
 }
 
+void android_set_toolbar_title(VM& vm, const uint8_t argc) {
+    if (argc < 1) {
+        for (int i = 0; i < argc; i++) vm.stack_manager.pop();
+        vm.stack_manager.push(Value::createNIL());
+        return;
+    }
+
+    Value titleVal = vm.stack_manager.pop();
+    for (int i = 1; i < argc; i++) vm.stack_manager.pop();
+
+    std::string title = titleVal.toString();
+
+    JNIEnv* env;
+    droplet_java_vm->AttachCurrentThread(&env, nullptr);
+
+    jclass cls = env->GetObjectClass(droplet_activity);
+    jmethodID method = env->GetMethodID(cls, "setToolbarTitle", "(Ljava/lang/String;)V");
+    jstring jtitle = env->NewStringUTF(title.c_str());
+    env->CallVoidMethod(droplet_activity, method, jtitle);
+    env->DeleteLocalRef(jtitle);
+
+    vm.stack_manager.push(Value::createNIL());
+}
+
+// Create a new screen (returns screen ID)
+void android_create_screen(VM& vm, const uint8_t argc) {
+    if (argc < 1) {
+        for (int i = 0; i < argc; i++) vm.stack_manager.pop();
+        vm.stack_manager.push(Value::createINT(-1));
+        return;
+    }
+
+    Value nameVal = vm.stack_manager.pop();
+    for (int i = 1; i < argc; i++) vm.stack_manager.pop();
+
+    std::string name = nameVal.toString();
+    int screenId = g_next_view_id++;
+
+    JNIEnv* env;
+    droplet_java_vm->AttachCurrentThread(&env, nullptr);
+
+    jclass cls = env->GetObjectClass(droplet_activity);
+    jmethodID method = env->GetMethodID(cls, "createScreen", "(ILjava/lang/String;)V");
+    jstring jname = env->NewStringUTF(name.c_str());
+    env->CallVoidMethod(droplet_activity, method, screenId, jname);
+    env->DeleteLocalRef(jname);
+
+    push_int_to_vm_stack(vm, screenId);
+}
+
+// Navigate to a screen by ID
+void android_navigate_to_screen(VM& vm, const uint8_t argc) {
+    if (argc < 1) {
+        for (int i = 0; i < argc; i++) vm.stack_manager.pop();
+        vm.stack_manager.push(Value::createNIL());
+        return;
+    }
+
+    Value screenIdVal = vm.stack_manager.pop();
+    for (int i = 1; i < argc; i++) vm.stack_manager.pop();
+
+    int screenId = (screenIdVal.type == ValueType::INT) ? screenIdVal.current_value.i : -1;
+
+    JNIEnv* env;
+    droplet_java_vm->AttachCurrentThread(&env, nullptr);
+
+    jclass cls = env->GetObjectClass(droplet_activity);
+    jmethodID method = env->GetMethodID(cls, "navigateToScreen", "(I)V");
+    env->CallVoidMethod(droplet_activity, method, screenId);
+
+    vm.stack_manager.push(Value::createNIL());
+}
+
+// Navigate back
+void android_navigate_back(VM& vm, const uint8_t argc) {
+    for (int i = 0; i < argc; i++) vm.stack_manager.pop();
+
+    JNIEnv* env;
+    droplet_java_vm->AttachCurrentThread(&env, nullptr);
+
+    jclass cls = env->GetObjectClass(droplet_activity);
+    jmethodID method = env->GetMethodID(cls, "navigateBack", "()V");
+    env->CallVoidMethod(droplet_activity, method);
+
+    vm.stack_manager.push(Value::createNIL());
+}
+
+// Set back button visibility
+void android_set_back_button_visible(VM& vm, const uint8_t argc) {
+    if (argc < 1) {
+        for (int i = 0; i < argc; i++) vm.stack_manager.pop();
+        vm.stack_manager.push(Value::createNIL());
+        return;
+    }
+
+    Value visibleVal = vm.stack_manager.pop();
+    for (int i = 1; i < argc; i++) vm.stack_manager.pop();
+
+    int visible = (visibleVal.type == ValueType::INT) ? visibleVal.current_value.i : 0;
+
+    JNIEnv* env;
+    droplet_java_vm->AttachCurrentThread(&env, nullptr);
+
+    jclass cls = env->GetObjectClass(droplet_activity);
+    jmethodID method = env->GetMethodID(cls, "setBackButtonVisible", "(Z)V");
+    env->CallVoidMethod(droplet_activity, method, visible != 0);
+
+    vm.stack_manager.push(Value::createNIL());
+}
 #endif

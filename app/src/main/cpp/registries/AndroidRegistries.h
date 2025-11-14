@@ -1,7 +1,3 @@
-//
-// Created by NITRO on 11/13/2025.
-//
-
 #ifndef MIST_ANDROIDREGISTRIES_H
 #define MIST_ANDROIDREGISTRIES_H
 
@@ -34,7 +30,13 @@ inline void initAndroidBuiltins() {
     // RecyclerView specific
     registerNative({"android_recyclerview_add_item", Type::Null(), {}});
     registerNative({"android_recyclerview_clear", Type::Null(), {}});
-}
 
+    // Toolbar and Navigation
+    registerNative({"android_set_toolbar_title", Type::Null(), {}});
+    registerNative({"android_create_screen", Type::Int(), {}});
+    registerNative({"android_navigate_to_screen", Type::Null(), {}});
+    registerNative({"android_navigate_back", Type::Null(), {}});
+    registerNative({"android_set_back_button_visible", Type::Null(), {}});
+}
 
 #endif //MIST_ANDROIDREGISTRIES_H
