@@ -1,0 +1,252 @@
+class Android {
+    // Layout creation
+    fn create_linearlayout(orientation: int, parentId: int) -> int {
+        let x = android_create_linearlayout(orientation, parentId) as int
+        return x
+    }
+
+    fn create_scrollview(parentId: int) -> int {
+        let x = android_create_scrollview(parentId) as int
+        return x
+    }
+
+    fn create_cardview(parentId: int, elevation: int, cornerRadius: int) -> int {
+        let x = android_create_cardview(parentId, elevation, cornerRadius) as int
+        return x
+    }
+
+    fn create_recyclerview(parentId: int, layoutType: int) -> int {
+        let x = android_create_recyclerview(parentId, layoutType) as int
+        return x
+    }
+
+    // Basic views
+    fn create_textview(text: str, parentId: int) -> int {
+        let x = android_create_textview(text, parentId) as int
+        return x
+    }
+
+    fn create_imageview(path: str, parentId: int, w: int, h: int) -> int {
+        let x = android_create_imageview(path, parentId, w, h) as int
+        return x
+    }
+
+    fn create_button(label: str, callback: fn() -> void, parentId: int) -> int {
+        let x = android_create_button(label, callback, parentId) as int
+        return x
+    }
+
+    // View manipulation
+    fn set_view_text(id: int, text: str) -> void {
+        android_set_view_text(id, text)
+    }
+
+    fn set_view_image(id: int, path: str) -> void {
+        android_set_view_image(id, path)
+    }
+
+    fn set_view_visibility(id: int, visibility: int) -> void {
+        android_set_view_visibility(id, visibility)
+    }
+
+    fn set_view_background_color(id: int, color: int) -> void {
+        android_set_view_background_color(id, color)
+    }
+
+    fn set_view_padding(id: int, left: int, top: int, right: int, bottom: int) -> void {
+        android_set_view_padding(id, left, top, right, bottom)
+    }
+
+    fn set_view_size(id: int, width: int, height: int) -> void {
+        android_set_view_size(id, width, height)
+    }
+
+    fn add_view_to_parent(parentId: int, childId: int) -> void {
+        android_add_view_to_parent(parentId, childId)
+    }
+
+    fn recyclerview_add_item(id: int, text: str) -> void {
+        android_recyclerview_add_item(id, text)
+    }
+
+    fn recyclerview_clear(id: int) -> void {
+        android_recyclerview_clear(id)
+    }
+
+    fn toast(msg: str) -> void {
+        android_native_toast(msg)
+    }
+
+    fn color_rgb(r: int, g: int, b: int) -> int {
+        let alpha = 255
+        let color = (alpha * 16777216) + (r * 65536) + (g * 256) + b
+        return color
+    }
+
+    fn color_argb(a: int, r: int, g: int, b: int) -> int {
+        let color = (a * 16777216) + (r * 65536) + (g * 256) + b
+        return color
+    }
+}
+
+class Counter {
+    value: int
+    labelId: int
+    android: Android
+
+    new(lid: int, androidInstance: Android) {
+        self.value = 0
+        self.labelId = lid
+        self.android = androidInstance
+    }
+
+    fn increment() -> void {
+        self.value = self.value + 1
+        let sst = str(self.value) as str
+        let text = "Count: " + sst
+        self.android.set_view_text(self.labelId, text)
+        self.android.toast(text)
+    }
+
+    fn decrement() -> void {
+        self.value = self.value - 1
+        let sst = str(self.value) as str
+        let text = "Count: " + sst
+        self.android.set_view_text(self.labelId, text)
+        self.android.toast(text)
+    }
+
+    fn reset() -> void {
+        self.value = 0
+        self.android.set_view_text(self.labelId, "Count: 0")
+        self.android.toast("Counter reset!")
+    }
+}
+
+fn main() -> void {
+    let android = Android()
+
+    // Create main ScrollView to wrap everything
+    let scrollId = android.create_scrollview(-1)
+
+    // Title at top (now inside scroll view)
+    let titleId = android.create_textview("Counter App", scrollId)
+    android.set_view_padding(titleId, 16, 16, 16, 16)
+
+    // Create a Card for the counter
+    let cardId = android.create_cardview(scrollId, 8, 16)
+    let lightBlue = android.color_rgb(200, 220, 255)
+    android.set_view_background_color(cardId, lightBlue)
+
+    // Counter display label inside card
+    let labelId = android.create_textview("Count: 0", cardId)
+    android.set_view_padding(labelId, 0, 8, 0, 16)
+
+    // Image inside card
+    let imageId = android.create_imageview(
+        "https://upload.wikimedia.org/wikipedia/commons/9/99/Sample_User_Icon.png",
+        cardId,
+        200,
+        200
+    )
+
+    // Create counter instance
+    let counter = Counter(labelId, android)
+
+    // Create horizontal button layout inside the card
+    let buttonRow = android.create_linearlayout(1, cardId)
+    android.set_view_padding(buttonRow, 0, 16, 0, 0)
+
+    // Add buttons to the button row
+    android.create_button("−", counter.decrement, buttonRow)
+    android.create_button("Reset", counter.reset, buttonRow)
+    android.create_button("+", counter.increment, buttonRow)
+
+    // Info card (inside scroll view)
+    let infoCard = android.create_cardview(scrollId, 4, 12)
+    let lightGray = android.color_rgb(240, 240, 240)
+    android.set_view_background_color(infoCard, lightGray)
+
+    android.create_textview("Instructions:", infoCard)
+    android.create_textview("• Tap + to add 1", infoCard)
+    android.create_textview("• Tap − to subtract 1", infoCard)
+    android.create_textview("• Tap Reset to return to 0", infoCard)
+
+    // RecyclerView for history (inside scroll view)
+    let historyTitle = android.create_textview("History:", scrollId)
+    android.set_view_padding(historyTitle, 16, 16, 16, 8)
+
+    let historyList = android.create_recyclerview(scrollId, 0)
+    android.set_view_size(historyList, -2, 300)
+
+    // Add some initial items
+    android.recyclerview_add_item(historyList, "App started")
+    android.recyclerview_add_item(historyList, "Counter initialized to 0")
+    android.recyclerview_add_item(historyList, "Ready to count")
+    android.recyclerview_add_item(historyList, "Tap any button to begin")
+    android.recyclerview_add_item(historyList, "History will appear here")
+
+    // Add statistics card
+    let statsCard = android.create_cardview(scrollId, 4, 12)
+    let lightGreen = android.color_rgb(200, 255, 200)
+    android.set_view_background_color(statsCard, lightGreen)
+
+    android.create_textview("Statistics:", statsCard)
+    android.create_textview("Total clicks: 0", statsCard)
+    android.create_textview("Session time: 0 seconds", statsCard)
+    android.create_textview("Last action: None", statsCard)
+
+    // Add features card
+    let featuresCard = android.create_cardview(scrollId, 4, 12)
+    let lightYellow = android.color_rgb(255, 255, 200)
+    android.set_view_background_color(featuresCard, lightYellow)
+
+    android.create_textview("Features:", featuresCard)
+    android.create_textview("✓ Real-time counter updates", featuresCard)
+    android.create_textview("✓ Toast notifications", featuresCard)
+    android.create_textview("✓ Material Design cards", featuresCard)
+    android.create_textview("✓ Smooth scrolling", featuresCard)
+    android.create_textview("✓ Responsive layout", featuresCard)
+
+    // Add about card
+    let aboutCard = android.create_cardview(scrollId, 4, 12)
+    let lightPink = android.color_rgb(255, 200, 220)
+    android.set_view_background_color(aboutCard, lightPink)
+
+    android.create_textview("About:", aboutCard)
+    android.create_textview("This is a demo Android app", aboutCard)
+    android.create_textview("built with Droplet VM", aboutCard)
+    android.create_textview("Scroll down to see more!", aboutCard)
+
+    // Add tips card
+    let tipsCard = android.create_cardview(scrollId, 4, 12)
+    let lightCyan = android.color_rgb(200, 255, 255)
+    android.set_view_background_color(tipsCard, lightCyan)
+
+    android.create_textview("Tips:", tipsCard)
+    android.create_textview("• Hold the increment button for faster counting", tipsCard)
+    android.create_textview("• Use reset when you want to start over", tipsCard)
+    android.create_textview("• Watch the toast messages at the bottom", tipsCard)
+    android.create_textview("• Try scrolling through all sections", tipsCard)
+
+    // Add version info card
+    let versionCard = android.create_cardview(scrollId, 4, 12)
+    let lightGray2 = android.color_rgb(220, 220, 220)
+    android.set_view_background_color(versionCard, lightGray2)
+
+    android.create_textview("Version Information:", versionCard)
+    android.create_textview("App Version: 1.0.0", versionCard)
+    android.create_textview("Droplet VM: Latest", versionCard)
+    android.create_textview("Build Date: 2025", versionCard)
+
+    // Add footer card
+    let footerCard = android.create_cardview(scrollId, 8, 16)
+    let darkBlue = android.color_rgb(150, 180, 255)
+    android.set_view_background_color(footerCard, darkBlue)
+
+    android.create_textview("🎉 You've reached the end!", footerCard)
+    android.create_textview("Scroll back up to interact with the counter", footerCard)
+    android.set_view_padding(footerCard, 16, 32, 16, 32)
+
+    android.toast("Counter app ready! Tap buttons to interact.")
+}
