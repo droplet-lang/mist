@@ -12,6 +12,7 @@
 extern "C" {
 JavaVM* droplet_java_vm = nullptr;
 jobject droplet_activity = nullptr;
+static int g_next_view_id = 1000; // start from 1000 to avoid collision
 
 JNIEXPORT void JNICALL
 Java_com_mist_example_MainActivity_registerVM(JNIEnv* env, jobject thiz) {
@@ -22,6 +23,11 @@ Java_com_mist_example_MainActivity_registerVM(JNIEnv* env, jobject thiz) {
 
 // Global VM reference and callback storage
 static VM* g_vm_instance = nullptr;
+
+void push_int_to_vm_stack(VM& vm, int n) {
+    // Replace with your actual Value creation for integers
+    vm.stack_manager.push(Value::createINT(n));
+}
 
 struct CallbackInfo {
     Value callback;  // Store the actual callback object (ObjBoundMethod or ObjFunction)
@@ -68,52 +74,35 @@ void android_create_button(VM& vm, const uint8_t argc) {
     __android_log_print(ANDROID_LOG_INFO, LOG_TAG, "create_button called with argc: %d", argc);
 
     if(argc < 2) {
-        __android_log_print(ANDROID_LOG_ERROR, LOG_TAG, "create_button requires 2 args (got %d)", argc);
+        __android_log_print(ANDROID_LOG_ERROR, LOG_TAG, "create_button requires at least 2 args (got %d)", argc);
         for (int i = 0; i < argc; i++) vm.stack_manager.pop();
         vm.stack_manager.push(Value::createNIL());
         return;
+    }
+
+    // Pop arguments in reverse order (last pushed = first popped)
+    int parentId = -1;
+    if (argc >= 3) {
+        Value parent = vm.stack_manager.pop();
+        parentId = (parent.type == ValueType::INT) ? parent.current_value.i : -1;
     }
 
     Value callback = vm.stack_manager.pop();
     Value title = vm.stack_manager.pop();
 
     // Pop any extra arguments
-    for (int i = 2; i < argc; i++) {
+    for (int i = 3; i < argc; i++) {
         vm.stack_manager.pop();
     }
 
-    __android_log_print(ANDROID_LOG_INFO, LOG_TAG, "Button: %s, Callback type: %d",
-                        title.toString().c_str(), static_cast<int>(callback.type));
-
-    // Log detailed callback information AT STORAGE TIME
-    __android_log_print(ANDROID_LOG_INFO, LOG_TAG, "=== STORING CALLBACK ===");
-    __android_log_print(ANDROID_LOG_INFO, LOG_TAG, "Callback type: %d", static_cast<int>(callback.type));
-    __android_log_print(ANDROID_LOG_INFO, LOG_TAG, "Callback object ptr: %p",
-                        (callback.type == ValueType::OBJECT) ? callback.current_value.object : nullptr);
-
-    if (callback.type == ValueType::OBJECT && callback.current_value.object) {
-        auto* boundMethod = dynamic_cast<ObjBoundMethod*>(callback.current_value.object);
-        if (boundMethod) {
-            __android_log_print(ANDROID_LOG_INFO, LOG_TAG, "Callback is BoundMethod, methodIndex: %d",
-                                boundMethod->methodIndex);
-        }
-
-        auto* fnObj = dynamic_cast<ObjFunction*>(callback.current_value.object);
-        if (fnObj) {
-            __android_log_print(ANDROID_LOG_INFO, LOG_TAG, "Callback is Function, functionIndex: %d",
-                                fnObj->functionIndex);
-        }
-    } else {
-        __android_log_print(ANDROID_LOG_WARN, LOG_TAG, "Callback is not an object! Type: %d, storing as-is",
-                            static_cast<int>(callback.type));
-    }
+    __android_log_print(ANDROID_LOG_INFO, LOG_TAG, "Button: %s, Callback type: %d, ParentId: %d",
+                        title.toString().c_str(), static_cast<int>(callback.type), parentId);
 
     // Store callback info
     int callbackId = g_next_callback_id++;
     CallbackInfo info;
-    info.callback = callback;  // Store the Value directly - it should be ObjBoundMethod or ObjFunction
+    info.callback = callback;
 
-    // CRITICAL: Keep the object alive by storing it as a GC root
     if (callback.type == ValueType::OBJECT && callback.current_value.object) {
         info.gcRoot = callback.current_value.object;
         g_callback_gc_roots.push_back(callback.current_value.object);
@@ -125,18 +114,21 @@ void android_create_button(VM& vm, const uint8_t argc) {
 
     g_callbacks[callbackId] = info;
 
-    __android_log_print(ANDROID_LOG_INFO, LOG_TAG, "Registered callback ID: %d", callbackId);
+    // Don't generate a buttonId - let Java handle it
+    __android_log_print(ANDROID_LOG_INFO, LOG_TAG, "Created callback ID: %d", callbackId);
 
     JNIEnv* env;
     droplet_java_vm->AttachCurrentThread(&env, nullptr);
 
     jclass cls = env->GetObjectClass(droplet_activity);
-    jmethodID method = env->GetMethodID(cls, "createButton", "(Ljava/lang/String;I)V");
+    // Use the original 3-parameter signature
+    jmethodID method = env->GetMethodID(cls, "createButton", "(Ljava/lang/String;II)V");
 
     jstring jtitle = env->NewStringUTF(title.toString().c_str());
-    env->CallVoidMethod(droplet_activity, method, jtitle, callbackId);
+    env->CallVoidMethod(droplet_activity, method, jtitle, callbackId, parentId);
     env->DeleteLocalRef(jtitle);
 
+    // Return NIL since we don't need the button ID in Droplet
     vm.stack_manager.push(Value::createNIL());
 }
 
@@ -222,29 +214,24 @@ Java_com_mist_example_MainActivity_onButtonClick(JNIEnv* env, jobject thiz, jint
     }
 }
 
-static int g_next_view_id = 1000; // start from 1000 to avoid collision
 
-void push_int_to_vm_stack(VM& vm, int n) {
-    // Replace with your actual Value creation for integers
-    vm.stack_manager.push(Value::createINT(n));
-}
-
-// Create TextView: signature in Droplet: android_create_textview("Hello", parentId_opt?)
 void android_create_textview(VM& vm, const uint8_t argc) {
     if (argc < 1) {
-        // pop whatever present
         for (int i = 0; i < argc; i++) vm.stack_manager.pop();
         vm.stack_manager.push(Value::createNIL());
         return;
     }
 
-    Value textVal = vm.stack_manager.pop();
+    // Pop in correct order
     int parentId = -1;
     if (argc >= 2) {
         Value parentVal = vm.stack_manager.pop();
         parentId = (parentVal.type == ValueType::INT) ? parentVal.current_value.i : -1;
     }
-    // pop extras
+
+    Value textVal = vm.stack_manager.pop();
+
+    // Pop extras
     for (int i = 2; i < argc; i++) vm.stack_manager.pop();
 
     std::string text = textVal.toString();
@@ -262,13 +249,12 @@ void android_create_textview(VM& vm, const uint8_t argc) {
     push_int_to_vm_stack(vm, viewId);
 }
 
-// Create ImageView: args: (pathOrUrl, parentId_opt, width, height)
+
 void android_create_imageview(VM& vm, const uint8_t argc) {
-    // Expected args: pathOrUrl, parentId_opt, width, height
     std::string path = "";
     int parentId = -1, width = -1, height = -1;
 
-    // Pop in reverse order (last arg first)
+    // Pop in reverse order (LIFO)
     if (argc >= 4) {
         Value h = vm.stack_manager.pop();
         if (h.type == ValueType::INT) height = h.current_value.i;
@@ -286,6 +272,8 @@ void android_create_imageview(VM& vm, const uint8_t argc) {
         path = pathVal.toString();
     }
 
+    for (int i = 4; i < argc; i++) vm.stack_manager.pop();
+
     int viewId = g_next_view_id++;
 
     JNIEnv* env;
@@ -300,6 +288,7 @@ void android_create_imageview(VM& vm, const uint8_t argc) {
 
     push_int_to_vm_stack(vm, viewId);
 }
+
 
 void android_create_linearlayout(VM& vm, const uint8_t argc) {
     // args: orientation (0=vertical, 1=horizontal), parentId_opt
@@ -421,5 +410,201 @@ void android_set_view_property(VM& vm, const uint8_t argc) {
     vm.stack_manager.push(Value::createNIL());
 }
 
+// Create ScrollView
+void android_create_scrollview(VM& vm, const uint8_t argc) {
+    int parentId = -1;
+    if (argc >= 1) {
+        Value p = vm.stack_manager.pop();
+        parentId = (p.type == ValueType::INT) ? p.current_value.i : -1;
+    }
+    for (int i = 1; i < argc; i++) vm.stack_manager.pop();
+
+    int viewId = g_next_view_id++;
+    JNIEnv* env;
+    droplet_java_vm->AttachCurrentThread(&env, nullptr);
+
+    jclass cls = env->GetObjectClass(droplet_activity);
+    jmethodID method = env->GetMethodID(cls, "createScrollView", "(II)V");
+    env->CallVoidMethod(droplet_activity, method, viewId, parentId);
+
+    push_int_to_vm_stack(vm, viewId);
+}
+
+// Create CardView
+void android_create_cardview(VM& vm, const uint8_t argc) {
+    int parentId = -1;
+    int elevation = 8; // default elevation in dp
+    int cornerRadius = 8; // default corner radius in dp
+
+    if (argc >= 3) {
+        Value r = vm.stack_manager.pop();
+        cornerRadius = (r.type == ValueType::INT) ? r.current_value.i : 8;
+    }
+    if (argc >= 2) {
+        Value e = vm.stack_manager.pop();
+        elevation = (e.type == ValueType::INT) ? e.current_value.i : 8;
+    }
+    if (argc >= 1) {
+        Value p = vm.stack_manager.pop();
+        parentId = (p.type == ValueType::INT) ? p.current_value.i : -1;
+    }
+    for (int i = 3; i < argc; i++) vm.stack_manager.pop();
+
+    int viewId = g_next_view_id++;
+    JNIEnv* env;
+    droplet_java_vm->AttachCurrentThread(&env, nullptr);
+
+    jclass cls = env->GetObjectClass(droplet_activity);
+    jmethodID method = env->GetMethodID(cls, "createCardView", "(IIII)V");
+    env->CallVoidMethod(droplet_activity, method, viewId, parentId, elevation, cornerRadius);
+
+    push_int_to_vm_stack(vm, viewId);
+}
+
+// Create RecyclerView
+void android_create_recyclerview(VM& vm, const uint8_t argc) {
+    int parentId = -1;
+    int layoutType = 0; // 0=vertical, 1=horizontal, 2=grid
+
+    if (argc >= 2) {
+        Value l = vm.stack_manager.pop();
+        layoutType = (l.type == ValueType::INT) ? l.current_value.i : 0;
+    }
+    if (argc >= 1) {
+        Value p = vm.stack_manager.pop();
+        parentId = (p.type == ValueType::INT) ? p.current_value.i : -1;
+    }
+    for (int i = 2; i < argc; i++) vm.stack_manager.pop();
+
+    int viewId = g_next_view_id++;
+    JNIEnv* env;
+    droplet_java_vm->AttachCurrentThread(&env, nullptr);
+
+    jclass cls = env->GetObjectClass(droplet_activity);
+    jmethodID method = env->GetMethodID(cls, "createRecyclerView", "(III)V");
+    env->CallVoidMethod(droplet_activity, method, viewId, parentId, layoutType);
+
+    push_int_to_vm_stack(vm, viewId);
+}
+
+// Add item to RecyclerView
+void android_recyclerview_add_item(VM& vm, const uint8_t argc) {
+    if (argc < 2) {
+        for (int i = 0; i < argc; i++) vm.stack_manager.pop();
+        vm.stack_manager.push(Value::createNIL());
+        return;
+    }
+
+    Value textVal = vm.stack_manager.pop();
+    Value idVal = vm.stack_manager.pop();
+    int viewId = (idVal.type == ValueType::INT) ? idVal.current_value.i : -1;
+    std::string text = textVal.toString();
+
+    JNIEnv* env;
+    droplet_java_vm->AttachCurrentThread(&env, nullptr);
+    jclass cls = env->GetObjectClass(droplet_activity);
+    jmethodID method = env->GetMethodID(cls, "recyclerViewAddItem", "(ILjava/lang/String;)V");
+    jstring jtext = env->NewStringUTF(text.c_str());
+    env->CallVoidMethod(droplet_activity, method, viewId, jtext);
+    env->DeleteLocalRef(jtext);
+
+    vm.stack_manager.push(Value::createNIL());
+}
+
+// Clear RecyclerView items
+void android_recyclerview_clear(VM& vm, const uint8_t argc) {
+    if (argc < 1) {
+        for (int i = 0; i < argc; i++) vm.stack_manager.pop();
+        vm.stack_manager.push(Value::createNIL());
+        return;
+    }
+
+    Value idVal = vm.stack_manager.pop();
+    int viewId = (idVal.type == ValueType::INT) ? idVal.current_value.i : -1;
+
+    JNIEnv* env;
+    droplet_java_vm->AttachCurrentThread(&env, nullptr);
+    jclass cls = env->GetObjectClass(droplet_activity);
+    jmethodID method = env->GetMethodID(cls, "recyclerViewClear", "(I)V");
+    env->CallVoidMethod(droplet_activity, method, viewId);
+
+    vm.stack_manager.push(Value::createNIL());
+}
+
+// Set view background color
+void android_set_view_background_color(VM& vm, const uint8_t argc) {
+    if (argc < 2) {
+        for (int i = 0; i < argc; i++) vm.stack_manager.pop();
+        vm.stack_manager.push(Value::createNIL());
+        return;
+    }
+
+    Value colorVal = vm.stack_manager.pop();
+    Value idVal = vm.stack_manager.pop();
+    int viewId = (idVal.type == ValueType::INT) ? idVal.current_value.i : -1;
+    int color = (colorVal.type == ValueType::INT) ? colorVal.current_value.i : 0xFFFFFFFF;
+
+    JNIEnv* env;
+    droplet_java_vm->AttachCurrentThread(&env, nullptr);
+    jclass cls = env->GetObjectClass(droplet_activity);
+    jmethodID method = env->GetMethodID(cls, "setViewBackgroundColor", "(II)V");
+    env->CallVoidMethod(droplet_activity, method, viewId, color);
+
+    vm.stack_manager.push(Value::createNIL());
+}
+
+// Set view padding
+void android_set_view_padding(VM& vm, const uint8_t argc) {
+    if (argc < 5) {
+        for (int i = 0; i < argc; i++) vm.stack_manager.pop();
+        vm.stack_manager.push(Value::createNIL());
+        return;
+    }
+
+    Value bottom = vm.stack_manager.pop();
+    Value right = vm.stack_manager.pop();
+    Value top = vm.stack_manager.pop();
+    Value left = vm.stack_manager.pop();
+    Value idVal = vm.stack_manager.pop();
+
+    int viewId = (idVal.type == ValueType::INT) ? idVal.current_value.i : -1;
+    int l = (left.type == ValueType::INT) ? left.current_value.i : 0;
+    int t = (top.type == ValueType::INT) ? top.current_value.i : 0;
+    int r = (right.type == ValueType::INT) ? right.current_value.i : 0;
+    int b = (bottom.type == ValueType::INT) ? bottom.current_value.i : 0;
+
+    JNIEnv* env;
+    droplet_java_vm->AttachCurrentThread(&env, nullptr);
+    jclass cls = env->GetObjectClass(droplet_activity);
+    jmethodID method = env->GetMethodID(cls, "setViewPadding", "(IIIII)V");
+    env->CallVoidMethod(droplet_activity, method, viewId, l, t, r, b);
+
+    vm.stack_manager.push(Value::createNIL());
+}
+
+// Set view size (width, height in dp)
+void android_set_view_size(VM& vm, const uint8_t argc) {
+    if (argc < 3) {
+        for (int i = 0; i < argc; i++) vm.stack_manager.pop();
+        vm.stack_manager.push(Value::createNIL());
+        return;
+    }
+
+    Value heightVal = vm.stack_manager.pop();
+    Value widthVal = vm.stack_manager.pop();
+    Value idVal = vm.stack_manager.pop();
+
+    int viewId = (idVal.type == ValueType::INT) ? idVal.current_value.i : -1;
+    int width = (widthVal.type == ValueType::INT) ? widthVal.current_value.i : -1;
+    int height = (heightVal.type == ValueType::INT) ? heightVal.current_value.i : -1;
+
+    JNIEnv* env;
+    droplet_java_vm->AttachCurrentThread(&env, nullptr);
+    jclass cls = env->GetObjectClass(droplet_activity);
+    jmethodID method = env->GetMethodID(cls, "setViewSize", "(III)V");
+    env->CallVoidMethod(droplet_activity, method, viewId, width, height);
+
+    vm.stack_manager.push(Value::createNIL());
+}
 
 #endif

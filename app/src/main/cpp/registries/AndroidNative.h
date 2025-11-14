@@ -22,6 +22,14 @@ void android_set_view_text(VM& vm, const uint8_t argc);
 void android_set_view_image(VM& vm, const uint8_t argc);
 void android_set_view_visibility(VM& vm, const uint8_t argc);
 void android_set_view_property(VM& vm, const uint8_t argc); // generic property setter
+void android_create_scrollview(VM& vm, const uint8_t argc);
+void android_create_cardview(VM& vm, const uint8_t argc);
+void android_create_recyclerview(VM& vm, const uint8_t argc);
+void android_recyclerview_add_item(VM& vm, const uint8_t argc);
+void android_recyclerview_clear(VM& vm, const uint8_t argc);
+void android_set_view_background_color(VM& vm, const uint8_t argc);
+void android_set_view_padding(VM& vm, const uint8_t argc);
+void android_set_view_size(VM& vm, const uint8_t argc);
 
 inline void register_android_native_functions(VM& vm) {
     vm.register_native("android_native_toast", android_native_toast);
@@ -37,6 +45,14 @@ inline void register_android_native_functions(VM& vm) {
     vm.register_native("android_set_view_image", android_set_view_image);
     vm.register_native("android_set_view_visibility", android_set_view_visibility);
     vm.register_native("android_set_view_property", android_set_view_property);
+    vm.register_native("android_create_scrollview", android_create_scrollview);
+    vm.register_native("android_create_cardview", android_create_cardview);
+    vm.register_native("android_create_recyclerview", android_create_recyclerview);
+    vm.register_native("android_recyclerview_add_item", android_recyclerview_add_item);
+    vm.register_native("android_recyclerview_clear", android_recyclerview_clear);
+    vm.register_native("android_set_view_background_color", android_set_view_background_color);
+    vm.register_native("android_set_view_padding", android_set_view_padding);
+    vm.register_native("android_set_view_size", android_set_view_size);
 }
 #endif
 
