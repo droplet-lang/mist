@@ -23,8 +23,8 @@ class Android {
         return android_create_imageview(path, parentId, w, h) as int
     }
 
-    fn create_button(label: str, callback: fn() -> void, parentId: int) -> int {
-        return android_create_button(label, callback, parentId) as int
+    fn create_button(label: str, callback: fn() -> void, parentId: int) -> void {
+        android_create_button(label, callback, parentId)
     }
 
     fn set_view_background_color(id: int, color: int) -> void {
@@ -37,10 +37,6 @@ class Android {
 
     fn set_view_size(id: int, width: int, height: int) -> void {
         android_set_view_size(id, width, height)
-    }
-
-    fn add_view_to_parent(parentId: int, childId: int) -> void {
-        android_add_view_to_parent(parentId, childId)
     }
 
     fn recyclerview_add_item(id: int, txt: str) -> void {
@@ -67,177 +63,214 @@ class Android {
         android_navigate_to_screen(id)
     }
 
-    fn navigate_back() -> void {
-        android_navigate_back()
+    fn set_text_size(id: int, size: int) -> void {
+        android_set_text_size(id, size)
+    }
+
+    fn set_text_color(id: int, color: int) -> void {
+        android_set_text_color(id, color)
+    }
+
+    fn set_text_style(id: int, style: int) -> void {
+        android_set_text_style(id, style)
+    }
+
+    fn set_view_margin(id: int, left: int, top: int, right: int, bottom: int) -> void {
+        android_set_view_margin(id, left, top, right, bottom)
+    }
+
+    fn set_view_gravity(id: int, gravity: int) -> void {
+        android_set_view_gravity(id, gravity)
+    }
+
+    fn set_view_elevation(id: int, elevation: int) -> void {
+        android_set_view_elevation(id, elevation)
+    }
+
+    fn set_view_text(id: int, text: str) -> void {
+        android_set_view_text(id, text)
+    }
+
+    fn set_view_corner_radius(id: int, radius: int) -> void {
+        android_set_view_corner_radius(id, radius)
+    }
+
+    fn http_get(url: str, callback: fn(int, str, int) -> void) -> void {
+        android_http_get(url, callback, "")
+    }
+
+    fn http_post(url: str, body: str, callback: fn(int, str, int) -> void) -> void {
+        android_http_post(url, body, callback, "")
+    }
+
+    fn http_put(url: str, body: str, callback: fn(int, str, int) -> void) -> void {
+        android_http_put(url, body, callback, "")
+    }
+
+    fn http_delete(url: str, callback: fn(int, str, int) -> void) -> void {
+        android_http_delete(url, callback, "")
     }
 
     fn color_rgb(r: int, g: int, b: int) -> int {
         let a = 255
         return (a * 16777216) + (r * 65536) + (g * 256) + b
     }
-
-    fn color_argb(a: int, r: int, g: int, b: int) -> int {
-        return (a * 16777216) + (r * 65536) + (g * 256) + b
-    }
 }
 
-class KitchenSinkApp {
+class BhajanApp {
     android: Android
-
-    homeScreen: int
-    imgScreen: int
-    textScreen: int
-    buttonScreen: int
-    listScreen: int
-
-    rvList: int
-    counter: int
+    mainScroll: int
+    loadingText: int
+    itemCount: int
+    bhajansData: list[str]
+    detailsScreen: int
+    currentIndex: int
 
     new(a: Android) {
         self.android = a
-        self.counter = 0
-        self.homeScreen = -1
+        self.mainScroll = -1
+        self.loadingText = -1
+        self.itemCount = 0
+        self.bhajansData = []
+        self.detailsScreen = -1
+        self.currentIndex = -1
     }
 
-    // ------------------------------------------------
-    // HOME SCREEN (FIXED CARD)
-    // ------------------------------------------------
-    fn setup_home() -> void {
-        self.android.set_toolbar_title("Kitchen Sink Demo")
+    fn setup() -> void {
+        self.android.set_toolbar_title("Bhajan Collection")
 
-        let card = self.android.create_cardview(-1, 8, 16)
-        let bg = self.android.color_rgb(230, 240, 255)
-        self.android.set_view_background_color(card, bg)
-        self.android.set_view_padding(card, 20, 20, 20, 20)
+        // Create main scroll container
+        self.mainScroll = self.android.create_scrollview(-1)
 
-        self.android.create_textview("Component Examples", card)
+        // Header Card
+        let headerCard = self.android.create_cardview(self.mainScroll, 8, 16)
+        self.android.set_view_background_color(headerCard, self.android.color_rgb(139, 69, 19))
+        self.android.set_view_padding(headerCard, 24, 24, 24, 24)
+        self.android.set_view_margin(headerCard, 16, 16, 16, 16)
 
-        let row = self.android.create_linearlayout(1, card)
-        self.android.set_view_padding(row, 0, 16, 0, 0)
+        let headerTitle = self.android.create_textview("Bhajan Collection", headerCard)
+        self.android.set_text_size(headerTitle, 32)
+        self.android.set_text_color(headerTitle, self.android.color_rgb(255, 255, 255))
+        self.android.set_text_style(headerTitle, 1)
+        self.android.set_view_gravity(headerTitle, 1)
 
-        self.android.create_button("Images", self.nav_images, row)
-        self.android.create_button("Text", self.nav_text, row)
-        self.android.create_button("Buttons", self.nav_buttons, row)
-        self.android.create_button("RecyclerView", self.nav_list, row)
+        let headerSubtitle = self.android.create_textview("Devotional Songs & Chants", headerCard)
+        self.android.set_text_size(headerSubtitle, 16)
+        self.android.set_text_color(headerSubtitle, self.android.color_rgb(255, 228, 196))
+        self.android.set_view_gravity(headerSubtitle, 1)
+        self.android.set_view_margin(headerSubtitle, 0, 8, 0, 0)
+
+        // Refresh button
+        self.android.create_button("🔄 Refresh List", self.load_bhajans, self.mainScroll)
+
+        // Loading text
+        self.loadingText = self.android.create_textview("Loading bhajans...", self.mainScroll)
+        self.android.set_text_size(self.loadingText, 16)
+        self.android.set_text_color(self.loadingText, self.android.color_rgb(100, 100, 100))
+        self.android.set_view_gravity(self.loadingText, 1)
+        self.android.set_view_margin(self.loadingText, 16, 16, 16, 16)
+        self.android.set_text_style(self.loadingText, 2)
+
+        // Create details screen
+        self.detailsScreen = self.android.create_screen("Bhajan Details")
+
+        // Load bhajans on startup
+        self.load_bhajans()
     }
 
-    // ------------------------------------------------
-    // IMAGE SCREEN
-    // ------------------------------------------------
-    fn setup_image_screen() -> void {
-        self.imgScreen = self.android.create_screen("Images")
+    fn load_bhajans() -> void {
+        self.android.set_view_text(self.loadingText, "Loading bhajans...")
+        self.itemCount = 0
+        self.bhajansData = []
 
-        let card = self.android.create_cardview(self.imgScreen, 8, 16)
-        let color = self.android.color_rgb(255, 230, 230)
-        self.android.set_view_background_color(card, color)
-        self.android.set_view_padding(card, 18, 18, 18, 18)
-
-        self.android.create_textview("Image Demo", card)
-
-        self.android.create_imageview(
-            "https://upload.wikimedia.org/wikipedia/commons/9/99/Sample_User_Icon.png",
-            card,
-            200,
-            200
-        )
-
-        self.android.create_textview("Sample image shown above.", card)
+        let url = "https://raw.githubusercontent.com/svpz/mockfake/refs/heads/main/bhajans.json"
+        self.android.http_get(url, self.on_bhajans_loaded)
     }
 
-    // ------------------------------------------------
-    // TEXT SCREEN
-    // ------------------------------------------------
-    fn setup_text_screen() -> void {
-        self.textScreen = self.android.create_screen("Text Examples")
 
-        let card = self.android.create_cardview(self.textScreen, 6, 16)
-        let color = self.android.color_rgb(240, 255, 240)
-        self.android.set_view_background_color(card, color)
-        self.android.set_view_padding(card, 20, 20, 20, 20)
 
-        self.android.create_textview("Header Text", card)
-        self.android.create_textview("This is body text showing normal paragraphs.", card)
-        self.android.create_textview("More sample lines to demonstrate layout spacing.", card)
+ fn create_bhajan_card(title: str, imageUrl: str, index: int) -> void {
+     // Create card container (returns the inner LinearLayout ID)
+     let card = self.android.create_cardview(self.mainScroll, 12, 20)
+     self.android.set_view_background_color(card, self.android.color_rgb(255, 255, 255))
+     self.android.set_view_margin(card, 16, 12, 16, 12)
+     self.android.set_view_padding(card, 0, 0, 0, 0)
+
+     // Image at top (full width) - add directly to card's inner layout
+     let image = self.android.create_imageview(imageUrl, card, 400, 250)
+     self.android.set_view_margin(image, 0, 0, 0, 0)
+
+     // Title - add directly to card
+     let titleView = self.android.create_textview(title, card)
+     self.android.set_text_size(titleView, 18)
+     self.android.set_text_color(titleView, self.android.color_rgb(33, 33, 33))
+     self.android.set_text_style(titleView, 1)
+     self.android.set_view_margin(titleView, 20, 16, 20, 12)
+
+     // See More button - add directly to card
+     self.android.create_button("See More →", self.open_details, card)
+ }
+
+    fn open_details() -> void {
+        self.android.navigate_to_screen(self.detailsScreen)
+        self.android.toast("Details page - Coming soon!")
     }
 
-    // ------------------------------------------------
-    // BUTTON SCREEN
-    // ------------------------------------------------
-    fn setup_button_screen() -> void {
-        self.buttonScreen = self.android.create_screen("Buttons")
+    fn extract_items(json: str) -> int {
+        // Use native JSON array parser to extract all bhajan objects
+        let items = native_json_array_items(json)
+        let itemCount = len(items) as int
 
-        let card = self.android.create_cardview(self.buttonScreen, 8, 16)
-        let color = self.android.color_rgb(255, 250, 210)
-        self.android.set_view_background_color(card, color)
-        self.android.set_view_padding(card, 20, 20, 20, 20)
+        // Process each bhajan object
+        let i = 0
+        while i < itemCount {
+            let bhajanObj = str(items[i]) as str
 
-        self.android.create_textview("Button Interactions", card)
+            // Extract fields using native_json_get
+            let jsonLen = str_len(bhajanObj) as int
+            let title = native_json_get(bhajanObj, "title", jsonLen) as str
+            let imageUrl = native_json_get(bhajanObj, "image", jsonLen) as str
+            let url = native_json_get(bhajanObj, "url", jsonLen) as str
 
-        self.android.create_button("Tap Me", self.button_tap, card)
-        self.android.create_button("Toast", self.button_toast, card)
-        self.android.create_button("Counter +1", self.button_increment, card)
+            // Store bhajan data for later use
+            append(self.bhajansData, bhajanObj)
+
+            // Create card for this bhajan
+            self.create_bhajan_card(title, imageUrl, i)
+
+            i = i + 1
+        }
+
+        return itemCount
     }
 
-    fn button_tap() -> void {
-        self.android.toast("Tapped!")
+    fn on_bhajans_loaded(success: int, response: str, statusCode: int) -> void {
+        if success == 0 {
+            self.android.set_view_text(self.loadingText, "Failed to load bhajans. Please try again.")
+            self.android.toast("Error loading bhajans")
+            return
+        }
+
+        self.android.set_view_text(self.loadingText, "Loading content...")
+
+        let items = self.extract_items(response)
+
+        if items == 0 {
+            self.android.toast("No items found in response")
+            self.android.set_view_text(self.loadingText, "No bhajans found")
+            return
+        }
+
+        let countStr = int_to_str(items) as str
+        self.android.set_view_text(self.loadingText, "Showing " + countStr + " bhajans")
     }
-    fn button_toast() -> void {
-        self.android.toast("This is a toast!")
-    }
-    fn button_increment() -> void {
-        self.counter = self.counter + 1
-        let mdms = str(self.counter) as str
-        let s = "Counter: " + mdms
-        self.android.toast(s)
-    }
-
-    // ------------------------------------------------
-    // RECYCLER VIEW SCREEN
-    // ------------------------------------------------
-    fn setup_list_screen() -> void {
-        self.listScreen = self.android.create_screen("RecyclerView")
-
-        let card = self.android.create_cardview(self.listScreen, 6, 14)
-        let color = self.android.color_rgb(225, 240, 255)
-        self.android.set_view_background_color(card, color)
-        self.android.set_view_padding(card, 20, 20, 20, 20)
-
-        self.android.create_textview("RecyclerView Demo", card)
-
-        self.rvList = self.android.create_recyclerview(card, 1)
-
-        let row = self.android.create_linearlayout(1, card)
-        self.android.set_view_padding(row, 0, 12, 0, 0)
-
-        self.android.create_button("Add", self.add_item, row)
-        self.android.create_button("Clear", self.clear_items, row)
-    }
-
-    fn add_item() -> void {
-        self.android.recyclerview_add_item(self.rvList, "List Item")
-    }
-    fn clear_items() -> void {
-        self.android.recyclerview_clear(self.rvList)
-    }
-
-    // ------------------------------------------------
-    // Navigation
-    // ------------------------------------------------
-    fn nav_images() -> void { self.android.navigate_to_screen(self.imgScreen) }
-    fn nav_text() -> void { self.android.navigate_to_screen(self.textScreen) }
-    fn nav_buttons() -> void { self.android.navigate_to_screen(self.buttonScreen) }
-    fn nav_list() -> void { self.android.navigate_to_screen(self.listScreen) }
 }
 
 fn main() -> void {
     let android = Android()
-    let app = KitchenSinkApp(android)
+    let app = BhajanApp(android)
 
-    app.setup_home()
-    app.setup_image_screen()
-    app.setup_text_screen()
-    app.setup_button_screen()
-    app.setup_list_screen()
+    app.setup()
 
-    android.toast("Kitchen Sink Loaded!")
+    android.toast("Bhajan App Loaded!")
 }

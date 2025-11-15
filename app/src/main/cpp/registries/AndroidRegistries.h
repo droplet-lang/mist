@@ -37,6 +37,11 @@ inline void initAndroidBuiltins() {
     registerNative({"android_navigate_to_screen", Type::Null(), {}});
     registerNative({"android_navigate_back", Type::Null(), {}});
     registerNative({"android_set_back_button_visible", Type::Null(), {}});
+
+    registerNative({"android_http_get", Type::Null(), {}});
+    registerNative({"android_http_post", Type::Null(), {}});
+    registerNative({"android_http_put", Type::Null(), {}});
+    registerNative({"android_http_delete", Type::Null(), {}});
 }
 
 #endif //MIST_ANDROIDREGISTRIES_H

@@ -500,6 +500,8 @@ void android_recyclerview_add_item(VM& vm, const uint8_t argc) {
     int viewId = (idVal.type == ValueType::INT) ? idVal.current_value.i : -1;
     std::string text = textVal.toString();
 
+    __android_log_print(ANDROID_LOG_INFO, LOG_TAG, "Adding item to RecyclerView %d: %s", viewId, text.c_str());
+
     JNIEnv* env;
     droplet_java_vm->AttachCurrentThread(&env, nullptr);
     jclass cls = env->GetObjectClass(droplet_activity);
@@ -716,4 +718,570 @@ void android_set_back_button_visible(VM& vm, const uint8_t argc) {
 
     vm.stack_manager.push(Value::createNIL());
 }
+
+void android_create_edittext(VM& vm, const uint8_t argc) {
+    std::string hint = "";
+    int parentId = -1;
+
+    if (argc >= 2) {
+        Value p = vm.stack_manager.pop();
+        parentId = (p.type == ValueType::INT) ? p.current_value.i : -1;
+    }
+    if (argc >= 1) {
+        Value h = vm.stack_manager.pop();
+        hint = h.toString();
+    }
+    for (int i = 2; i < argc; i++) vm.stack_manager.pop();
+
+    int viewId = g_next_view_id++;
+
+    JNIEnv* env;
+    droplet_java_vm->AttachCurrentThread(&env, nullptr);
+
+    jclass cls = env->GetObjectClass(droplet_activity);
+    jmethodID method = env->GetMethodID(cls, "createEditText", "(Ljava/lang/String;II)V");
+    jstring jhint = env->NewStringUTF(hint.c_str());
+    env->CallVoidMethod(droplet_activity, method, jhint, viewId, parentId);
+    env->DeleteLocalRef(jhint);
+
+    push_int_to_vm_stack(vm, viewId);
+}
+
+void android_get_edittext_value(VM& vm, const uint8_t argc) {
+    if (argc < 1) {
+        for (int i = 0; i < argc; i++) vm.stack_manager.pop();
+        ObjString* str = vm.allocator.allocate_string("");
+        vm.stack_manager.push(Value::createOBJECT(str));
+        return;
+    }
+
+    Value idVal = vm.stack_manager.pop();
+    for (int i = 1; i < argc; i++) vm.stack_manager.pop();
+
+    int viewId = (idVal.type == ValueType::INT) ? idVal.current_value.i : -1;
+
+    JNIEnv* env;
+    droplet_java_vm->AttachCurrentThread(&env, nullptr);
+
+    jclass cls = env->GetObjectClass(droplet_activity);
+    jmethodID method = env->GetMethodID(cls, "getEditTextValue", "(I)Ljava/lang/String;");
+    jstring jresult = (jstring)env->CallObjectMethod(droplet_activity, method, viewId);
+
+    std::string result = "";
+    if (jresult != nullptr) {
+        const char* str = env->GetStringUTFChars(jresult, nullptr);
+        result = std::string(str);
+        env->ReleaseStringUTFChars(jresult, str);
+        env->DeleteLocalRef(jresult);
+    }
+    ObjString* str = vm.allocator.allocate_string(result);
+    vm.stack_manager.push(Value::createOBJECT(str));
+}
+
+void android_set_edittext_hint(VM& vm, const uint8_t argc) {
+    if (argc < 2) {
+        for (int i = 0; i < argc; i++) vm.stack_manager.pop();
+        vm.stack_manager.push(Value::createNIL());
+        return;
+    }
+
+    Value hintVal = vm.stack_manager.pop();
+    Value idVal = vm.stack_manager.pop();
+    for (int i = 2; i < argc; i++) vm.stack_manager.pop();
+
+    int viewId = (idVal.type == ValueType::INT) ? idVal.current_value.i : -1;
+    std::string hint = hintVal.toString();
+
+    JNIEnv* env;
+    droplet_java_vm->AttachCurrentThread(&env, nullptr);
+
+    jclass cls = env->GetObjectClass(droplet_activity);
+    jmethodID method = env->GetMethodID(cls, "setEditTextHint", "(ILjava/lang/String;)V");
+    jstring jhint = env->NewStringUTF(hint.c_str());
+    env->CallVoidMethod(droplet_activity, method, viewId, jhint);
+    env->DeleteLocalRef(jhint);
+
+    vm.stack_manager.push(Value::createNIL());
+}
+
+void android_set_edittext_input_type(VM& vm, const uint8_t argc) {
+    if (argc < 2) {
+        for (int i = 0; i < argc; i++) vm.stack_manager.pop();
+        vm.stack_manager.push(Value::createNIL());
+        return;
+    }
+
+    Value typeVal = vm.stack_manager.pop();
+    Value idVal = vm.stack_manager.pop();
+    for (int i = 2; i < argc; i++) vm.stack_manager.pop();
+
+    int viewId = (idVal.type == ValueType::INT) ? idVal.current_value.i : -1;
+    int inputType = (typeVal.type == ValueType::INT) ? typeVal.current_value.i : 1;
+
+    JNIEnv* env;
+    droplet_java_vm->AttachCurrentThread(&env, nullptr);
+
+    jclass cls = env->GetObjectClass(droplet_activity);
+    jmethodID method = env->GetMethodID(cls, "setEditTextInputType", "(II)V");
+    env->CallVoidMethod(droplet_activity, method, viewId, inputType);
+
+    vm.stack_manager.push(Value::createNIL());
+}
+
+// ============================================
+// STYLING FUNCTIONS
+// ============================================
+
+void android_set_text_size(VM& vm, const uint8_t argc) {
+    if (argc < 2) {
+        for (int i = 0; i < argc; i++) vm.stack_manager.pop();
+        vm.stack_manager.push(Value::createNIL());
+        return;
+    }
+
+    Value sizeVal = vm.stack_manager.pop();
+    Value idVal = vm.stack_manager.pop();
+    for (int i = 2; i < argc; i++) vm.stack_manager.pop();
+
+    int viewId = (idVal.type == ValueType::INT) ? idVal.current_value.i : -1;
+    int size = (sizeVal.type == ValueType::INT) ? sizeVal.current_value.i : 16;
+
+    JNIEnv* env;
+    droplet_java_vm->AttachCurrentThread(&env, nullptr);
+
+    jclass cls = env->GetObjectClass(droplet_activity);
+    jmethodID method = env->GetMethodID(cls, "setTextSize", "(II)V");
+    env->CallVoidMethod(droplet_activity, method, viewId, size);
+
+    vm.stack_manager.push(Value::createNIL());
+}
+
+void android_set_text_color(VM& vm, const uint8_t argc) {
+    if (argc < 2) {
+        for (int i = 0; i < argc; i++) vm.stack_manager.pop();
+        vm.stack_manager.push(Value::createNIL());
+        return;
+    }
+
+    Value colorVal = vm.stack_manager.pop();
+    Value idVal = vm.stack_manager.pop();
+    for (int i = 2; i < argc; i++) vm.stack_manager.pop();
+
+    int viewId = (idVal.type == ValueType::INT) ? idVal.current_value.i : -1;
+    int color = (colorVal.type == ValueType::INT) ? colorVal.current_value.i : 0xFF000000;
+
+    JNIEnv* env;
+    droplet_java_vm->AttachCurrentThread(&env, nullptr);
+
+    jclass cls = env->GetObjectClass(droplet_activity);
+    jmethodID method = env->GetMethodID(cls, "setTextColor", "(II)V");
+    env->CallVoidMethod(droplet_activity, method, viewId, color);
+
+    vm.stack_manager.push(Value::createNIL());
+}
+
+void android_set_text_style(VM& vm, const uint8_t argc) {
+    if (argc < 2) {
+        for (int i = 0; i < argc; i++) vm.stack_manager.pop();
+        vm.stack_manager.push(Value::createNIL());
+        return;
+    }
+
+    Value styleVal = vm.stack_manager.pop();
+    Value idVal = vm.stack_manager.pop();
+    for (int i = 2; i < argc; i++) vm.stack_manager.pop();
+
+    int viewId = (idVal.type == ValueType::INT) ? idVal.current_value.i : -1;
+    int style = (styleVal.type == ValueType::INT) ? styleVal.current_value.i : 0;
+
+    JNIEnv* env;
+    droplet_java_vm->AttachCurrentThread(&env, nullptr);
+
+    jclass cls = env->GetObjectClass(droplet_activity);
+    jmethodID method = env->GetMethodID(cls, "setTextStyle", "(II)V");
+    env->CallVoidMethod(droplet_activity, method, viewId, style);
+
+    vm.stack_manager.push(Value::createNIL());
+}
+
+void android_set_view_margin(VM& vm, const uint8_t argc) {
+    if (argc < 5) {
+        for (int i = 0; i < argc; i++) vm.stack_manager.pop();
+        vm.stack_manager.push(Value::createNIL());
+        return;
+    }
+
+    Value bottom = vm.stack_manager.pop();
+    Value right = vm.stack_manager.pop();
+    Value top = vm.stack_manager.pop();
+    Value left = vm.stack_manager.pop();
+    Value idVal = vm.stack_manager.pop();
+
+    int viewId = (idVal.type == ValueType::INT) ? idVal.current_value.i : -1;
+    int l = (left.type == ValueType::INT) ? left.current_value.i : 0;
+    int t = (top.type == ValueType::INT) ? top.current_value.i : 0;
+    int r = (right.type == ValueType::INT) ? right.current_value.i : 0;
+    int b = (bottom.type == ValueType::INT) ? bottom.current_value.i : 0;
+
+    JNIEnv* env;
+    droplet_java_vm->AttachCurrentThread(&env, nullptr);
+
+    jclass cls = env->GetObjectClass(droplet_activity);
+    jmethodID method = env->GetMethodID(cls, "setViewMargin", "(IIIII)V");
+    env->CallVoidMethod(droplet_activity, method, viewId, l, t, r, b);
+
+    vm.stack_manager.push(Value::createNIL());
+}
+
+void android_set_view_gravity(VM& vm, const uint8_t argc) {
+    if (argc < 2) {
+        for (int i = 0; i < argc; i++) vm.stack_manager.pop();
+        vm.stack_manager.push(Value::createNIL());
+        return;
+    }
+
+    Value gravityVal = vm.stack_manager.pop();
+    Value idVal = vm.stack_manager.pop();
+    for (int i = 2; i < argc; i++) vm.stack_manager.pop();
+
+    int viewId = (idVal.type == ValueType::INT) ? idVal.current_value.i : -1;
+    int gravity = (gravityVal.type == ValueType::INT) ? gravityVal.current_value.i : 0;
+
+    JNIEnv* env;
+    droplet_java_vm->AttachCurrentThread(&env, nullptr);
+
+    jclass cls = env->GetObjectClass(droplet_activity);
+    jmethodID method = env->GetMethodID(cls, "setViewGravity", "(II)V");
+    env->CallVoidMethod(droplet_activity, method, viewId, gravity);
+
+    vm.stack_manager.push(Value::createNIL());
+}
+
+void android_set_view_elevation(VM& vm, const uint8_t argc) {
+    if (argc < 2) {
+        for (int i = 0; i < argc; i++) vm.stack_manager.pop();
+        vm.stack_manager.push(Value::createNIL());
+        return;
+    }
+
+    Value elevVal = vm.stack_manager.pop();
+    Value idVal = vm.stack_manager.pop();
+    for (int i = 2; i < argc; i++) vm.stack_manager.pop();
+
+    int viewId = (idVal.type == ValueType::INT) ? idVal.current_value.i : -1;
+    int elevation = (elevVal.type == ValueType::INT) ? elevVal.current_value.i : 0;
+
+    JNIEnv* env;
+    droplet_java_vm->AttachCurrentThread(&env, nullptr);
+
+    jclass cls = env->GetObjectClass(droplet_activity);
+    jmethodID method = env->GetMethodID(cls, "setViewElevation", "(II)V");
+    env->CallVoidMethod(droplet_activity, method, viewId, elevation);
+
+    vm.stack_manager.push(Value::createNIL());
+}
+
+void android_set_view_corner_radius(VM& vm, const uint8_t argc) {
+    if (argc < 2) {
+        for (int i = 0; i < argc; i++) vm.stack_manager.pop();
+        vm.stack_manager.push(Value::createNIL());
+        return;
+    }
+
+    Value radiusVal = vm.stack_manager.pop();
+    Value idVal = vm.stack_manager.pop();
+    for (int i = 2; i < argc; i++) vm.stack_manager.pop();
+
+    int viewId = (idVal.type == ValueType::INT) ? idVal.current_value.i : -1;
+    int radius = (radiusVal.type == ValueType::INT) ? radiusVal.current_value.i : 0;
+
+    JNIEnv* env;
+    droplet_java_vm->AttachCurrentThread(&env, nullptr);
+
+    jclass cls = env->GetObjectClass(droplet_activity);
+    jmethodID method = env->GetMethodID(cls, "setViewCornerRadius", "(II)V");
+    env->CallVoidMethod(droplet_activity, method, viewId, radius);
+
+    vm.stack_manager.push(Value::createNIL());
+}
+
+void android_set_view_border(VM& vm, const uint8_t argc) {
+    if (argc < 3) {
+        for (int i = 0; i < argc; i++) vm.stack_manager.pop();
+        vm.stack_manager.push(Value::createNIL());
+        return;
+    }
+
+    Value colorVal = vm.stack_manager.pop();
+    Value widthVal = vm.stack_manager.pop();
+    Value idVal = vm.stack_manager.pop();
+    for (int i = 3; i < argc; i++) vm.stack_manager.pop();
+
+    int viewId = (idVal.type == ValueType::INT) ? idVal.current_value.i : -1;
+    int width = (widthVal.type == ValueType::INT) ? widthVal.current_value.i : 1;
+    int color = (colorVal.type == ValueType::INT) ? colorVal.current_value.i : 0xFF000000;
+
+    JNIEnv* env;
+    droplet_java_vm->AttachCurrentThread(&env, nullptr);
+
+    jclass cls = env->GetObjectClass(droplet_activity);
+    jmethodID method = env->GetMethodID(cls, "setViewBorder", "(III)V");
+    env->CallVoidMethod(droplet_activity, method, viewId, width, color);
+
+    vm.stack_manager.push(Value::createNIL());
+}
+
+// ============================================
+// HTTP FUNCTIONS
+// ============================================
+
+// HTTP GET: android_http_get(url, callback, headers_optional)
+void android_http_get(VM& vm, const uint8_t argc) {
+    if (argc < 2) {
+        for (int i = 0; i < argc; i++) vm.stack_manager.pop();
+        vm.stack_manager.push(Value::createNIL());
+        return;
+    }
+
+    // Pop headers if provided (optional JSON string)
+    std::string headers = "";
+    if (argc >= 3) {
+        Value headersVal = vm.stack_manager.pop();
+        headers = headersVal.toString();
+    }
+
+    Value callback = vm.stack_manager.pop();
+    Value urlVal = vm.stack_manager.pop();
+
+    for (int i = 3; i < argc; i++) vm.stack_manager.pop();
+
+    std::string url = urlVal.toString();
+    int callbackId = g_next_callback_id++;
+
+    CallbackInfo info;
+    info.callback = callback;
+    if (callback.type == ValueType::OBJECT && callback.current_value.object) {
+        info.gcRoot = callback.current_value.object;
+        g_callback_gc_roots.push_back(callback.current_value.object);
+    } else {
+        info.gcRoot = nullptr;
+    }
+    g_callbacks[callbackId] = info;
+
+    JNIEnv* env;
+    droplet_java_vm->AttachCurrentThread(&env, nullptr);
+
+    jclass cls = env->GetObjectClass(droplet_activity);
+    jmethodID method = env->GetMethodID(cls, "httpGet", "(Ljava/lang/String;ILjava/lang/String;)V");
+    jstring jurl = env->NewStringUTF(url.c_str());
+    jstring jheaders = env->NewStringUTF(headers.c_str());
+    env->CallVoidMethod(droplet_activity, method, jurl, callbackId, jheaders);
+    env->DeleteLocalRef(jurl);
+    env->DeleteLocalRef(jheaders);
+
+    vm.stack_manager.push(Value::createNIL());
+}
+
+// HTTP POST: android_http_post(url, body, callback, headers_optional)
+void android_http_post(VM& vm, const uint8_t argc) {
+    if (argc < 3) {
+        for (int i = 0; i < argc; i++) vm.stack_manager.pop();
+        vm.stack_manager.push(Value::createNIL());
+        return;
+    }
+
+    std::string headers = "";
+    if (argc >= 4) {
+        Value headersVal = vm.stack_manager.pop();
+        headers = headersVal.toString();
+    }
+
+    Value callback = vm.stack_manager.pop();
+    Value bodyVal = vm.stack_manager.pop();
+    Value urlVal = vm.stack_manager.pop();
+
+    for (int i = 4; i < argc; i++) vm.stack_manager.pop();
+
+    std::string url = urlVal.toString();
+    std::string body = bodyVal.toString();
+    int callbackId = g_next_callback_id++;
+
+    CallbackInfo info;
+    info.callback = callback;
+    if (callback.type == ValueType::OBJECT && callback.current_value.object) {
+        info.gcRoot = callback.current_value.object;
+        g_callback_gc_roots.push_back(callback.current_value.object);
+    } else {
+        info.gcRoot = nullptr;
+    }
+    g_callbacks[callbackId] = info;
+
+    JNIEnv* env;
+    droplet_java_vm->AttachCurrentThread(&env, nullptr);
+
+    jclass cls = env->GetObjectClass(droplet_activity);
+    jmethodID method = env->GetMethodID(cls, "httpPost", "(Ljava/lang/String;Ljava/lang/String;ILjava/lang/String;)V");
+    jstring jurl = env->NewStringUTF(url.c_str());
+    jstring jbody = env->NewStringUTF(body.c_str());
+    jstring jheaders = env->NewStringUTF(headers.c_str());
+    env->CallVoidMethod(droplet_activity, method, jurl, jbody, callbackId, jheaders);
+    env->DeleteLocalRef(jurl);
+    env->DeleteLocalRef(jbody);
+    env->DeleteLocalRef(jheaders);
+
+    vm.stack_manager.push(Value::createNIL());
+}
+
+// HTTP PUT: android_http_put(url, body, callback, headers_optional)
+void android_http_put(VM& vm, const uint8_t argc) {
+    if (argc < 3) {
+        for (int i = 0; i < argc; i++) vm.stack_manager.pop();
+        vm.stack_manager.push(Value::createNIL());
+        return;
+    }
+
+    std::string headers = "";
+    if (argc >= 4) {
+        Value headersVal = vm.stack_manager.pop();
+        headers = headersVal.toString();
+    }
+
+    Value callback = vm.stack_manager.pop();
+    Value bodyVal = vm.stack_manager.pop();
+    Value urlVal = vm.stack_manager.pop();
+
+    for (int i = 4; i < argc; i++) vm.stack_manager.pop();
+
+    std::string url = urlVal.toString();
+    std::string body = bodyVal.toString();
+    int callbackId = g_next_callback_id++;
+
+    CallbackInfo info;
+    info.callback = callback;
+    if (callback.type == ValueType::OBJECT && callback.current_value.object) {
+        info.gcRoot = callback.current_value.object;
+        g_callback_gc_roots.push_back(callback.current_value.object);
+    } else {
+        info.gcRoot = nullptr;
+    }
+    g_callbacks[callbackId] = info;
+
+    JNIEnv* env;
+    droplet_java_vm->AttachCurrentThread(&env, nullptr);
+
+    jclass cls = env->GetObjectClass(droplet_activity);
+    jmethodID method = env->GetMethodID(cls, "httpPut", "(Ljava/lang/String;Ljava/lang/String;ILjava/lang/String;)V");
+    jstring jurl = env->NewStringUTF(url.c_str());
+    jstring jbody = env->NewStringUTF(body.c_str());
+    jstring jheaders = env->NewStringUTF(headers.c_str());
+    env->CallVoidMethod(droplet_activity, method, jurl, jbody, callbackId, jheaders);
+    env->DeleteLocalRef(jurl);
+    env->DeleteLocalRef(jbody);
+    env->DeleteLocalRef(jheaders);
+
+    vm.stack_manager.push(Value::createNIL());
+}
+
+// HTTP DELETE: android_http_delete(url, callback, headers_optional)
+void android_http_delete(VM& vm, const uint8_t argc) {
+    if (argc < 2) {
+        for (int i = 0; i < argc; i++) vm.stack_manager.pop();
+        vm.stack_manager.push(Value::createNIL());
+        return;
+    }
+
+    std::string headers = "";
+    if (argc >= 3) {
+        Value headersVal = vm.stack_manager.pop();
+        headers = headersVal.toString();
+    }
+
+    Value callback = vm.stack_manager.pop();
+    Value urlVal = vm.stack_manager.pop();
+
+    for (int i = 3; i < argc; i++) vm.stack_manager.pop();
+
+    std::string url = urlVal.toString();
+    int callbackId = g_next_callback_id++;
+
+    CallbackInfo info;
+    info.callback = callback;
+    if (callback.type == ValueType::OBJECT && callback.current_value.object) {
+        info.gcRoot = callback.current_value.object;
+        g_callback_gc_roots.push_back(callback.current_value.object);
+    } else {
+        info.gcRoot = nullptr;
+    }
+    g_callbacks[callbackId] = info;
+
+    JNIEnv* env;
+    droplet_java_vm->AttachCurrentThread(&env, nullptr);
+
+    jclass cls = env->GetObjectClass(droplet_activity);
+    jmethodID method = env->GetMethodID(cls, "httpDelete", "(Ljava/lang/String;ILjava/lang/String;)V");
+    jstring jurl = env->NewStringUTF(url.c_str());
+    jstring jheaders = env->NewStringUTF(headers.c_str());
+    env->CallVoidMethod(droplet_activity, method, jurl, callbackId, jheaders);
+    env->DeleteLocalRef(jurl);
+    env->DeleteLocalRef(jheaders);
+
+    vm.stack_manager.push(Value::createNIL());
+}
+
+// HTTP Response callback (called from Java)
+extern "C"
+JNIEXPORT void JNICALL
+Java_com_mist_example_MainActivity_onHttpResponse(JNIEnv* env, jobject thiz,
+                                                  jint callbackId,
+                                                  jboolean success,
+                                                  jstring response,
+                                                  jint statusCode) {
+    __android_log_print(ANDROID_LOG_INFO, LOG_TAG, "HTTP response received for callback %d", callbackId);
+
+    if (!g_vm_instance) {
+        __android_log_print(ANDROID_LOG_ERROR, LOG_TAG, "VM instance not set");
+        return;
+    }
+
+    if (!g_vm_instance->is_ready()) {
+        __android_log_print(ANDROID_LOG_ERROR, LOG_TAG, "VM is not ready");
+        return;
+    }
+
+    auto it = g_callbacks.find(callbackId);
+    if (it == g_callbacks.end()) {
+        __android_log_print(ANDROID_LOG_ERROR, LOG_TAG, "Callback %d not found", callbackId);
+        return;
+    }
+
+    CallbackInfo& info = it->second;
+    Value callback = info.callback;
+
+    const char* responseStr = env->GetStringUTFChars(response, nullptr);
+    std::string responseData = std::string(responseStr);
+    env->ReleaseStringUTFChars(response, responseStr);
+
+    try {
+        // Create arguments: success (bool), response (string), statusCode (int)
+        std::vector<Value> args;
+        args.push_back(Value::createINT(success ? 1 : 0));
+
+        ObjString* responseObj = g_vm_instance->allocator.allocate_string(responseData);
+        args.push_back(Value::createOBJECT(responseObj));
+
+        args.push_back(Value::createINT(statusCode));
+
+        bool execSuccess = g_vm_instance->execute_callback(callback, args);
+
+        if (execSuccess) {
+            __android_log_print(ANDROID_LOG_INFO, LOG_TAG, "HTTP callback executed successfully");
+        } else {
+            __android_log_print(ANDROID_LOG_ERROR, LOG_TAG, "HTTP callback execution failed");
+        }
+
+    } catch (const std::exception& e) {
+        __android_log_print(ANDROID_LOG_ERROR, LOG_TAG, "Exception in HTTP callback: %s", e.what());
+    }
+}
+
 #endif

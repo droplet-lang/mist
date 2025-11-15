@@ -20,6 +20,13 @@ import java.net.URL
 import java.net.HttpURLConnection
 import java.util.concurrent.Executors
 import java.util.Stack
+ import android.text.InputType
+ import android.graphics.Typeface
+ import android.view.Gravity
+ import android.graphics.drawable.GradientDrawable
+ import android.graphics.drawable.ColorDrawable
+ import android.graphics.Color
+ import android.widget.EditText
 
 class MainActivity : AppCompatActivity() {
     private lateinit var toolbar: Toolbar
@@ -220,9 +227,25 @@ class MainActivity : AppCompatActivity() {
                 }
             }
 
-            getTargetContainer(parentId).addView(button)
+            // Use the same pattern as other view creation methods
+            val parent = if (parentId != -1 && viewMap.containsKey(parentId)) {
+                val p = viewMap[parentId]
+                if (p is ViewGroup) {
+                    Log.d(TAG, "Adding button to parent: $parentId")
+                    p
+                } else {
+                    Log.w(TAG, "Parent $parentId is not a ViewGroup, using target container")
+                    getTargetContainer(parentId)
+                }
+            } else {
+                Log.d(TAG, "No valid parent, using target container")
+                getTargetContainer(parentId)
+            }
+
+            parent.addView(button)
         }
     }
+
 
     // ... rest of the methods remain the same ...
     fun createTextView(text: String?, viewId: Int, parentId: Int) {
@@ -474,6 +497,353 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    fun createEditText(hint: String, viewId: Int, parentId: Int) {
+        runOnUiThread {
+            Log.d(TAG, "Creating EditText: id=$viewId, parent=$parentId, hint='$hint'")
+            val editText = EditText(this).apply {
+                this.hint = hint
+                setTextSize(TypedValue.COMPLEX_UNIT_SP, 16f)
+                setPadding(dpToPx(12), dpToPx(12), dpToPx(12), dpToPx(12))
+                layoutParams = LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.WRAP_CONTENT
+                ).apply {
+                    setMargins(8, 8, 8, 8)
+                }
+            }
+            viewMap[viewId] = editText
+            getTargetContainer(parentId).addView(editText)
+        }
+    }
+
+    fun getEditTextValue(viewId: Int): String {
+        val view = viewMap[viewId]
+        return if (view is EditText) {
+            view.text.toString()
+        } else {
+            ""
+        }
+    }
+
+    fun setEditTextHint(viewId: Int, hint: String) {
+        runOnUiThread {
+            val view = viewMap[viewId]
+            if (view is EditText) {
+                view.hint = hint
+            }
+        }
+    }
+
+    fun setEditTextInputType(viewId: Int, inputType: Int) {
+        runOnUiThread {
+            val view = viewMap[viewId]
+            if (view is EditText) {
+                view.inputType = when(inputType) {
+                    1 -> InputType.TYPE_CLASS_TEXT
+                    2 -> InputType.TYPE_CLASS_NUMBER
+                    3 -> InputType.TYPE_TEXT_VARIATION_PASSWORD
+                    4 -> InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS
+                    5 -> InputType.TYPE_CLASS_PHONE
+                    6 -> InputType.TYPE_TEXT_FLAG_MULTI_LINE
+                    else -> InputType.TYPE_CLASS_TEXT
+                }
+            }
+        }
+    }
+
+// ============================================
+// STYLING METHODS
+// ============================================
+
+    fun setTextSize(viewId: Int, size: Int) {
+        runOnUiThread {
+            val view = viewMap[viewId]
+            when (view) {
+                is TextView -> view.setTextSize(TypedValue.COMPLEX_UNIT_SP, size.toFloat())
+                is Button -> view.setTextSize(TypedValue.COMPLEX_UNIT_SP, size.toFloat())
+                is EditText -> view.setTextSize(TypedValue.COMPLEX_UNIT_SP, size.toFloat())
+            }
+        }
+    }
+
+    fun setTextColor(viewId: Int, color: Int) {
+        runOnUiThread {
+            val view = viewMap[viewId]
+            when (view) {
+                is TextView -> view.setTextColor(color)
+                is Button -> view.setTextColor(color)
+                is EditText -> view.setTextColor(color)
+            }
+        }
+    }
+
+    fun setTextStyle(viewId: Int, style: Int) {
+        runOnUiThread {
+            val view = viewMap[viewId]
+            val typeface = when(style) {
+                1 -> Typeface.BOLD
+                2 -> Typeface.ITALIC
+                3 -> Typeface.BOLD_ITALIC
+                else -> Typeface.NORMAL
+            }
+
+            when (view) {
+                is TextView -> view.setTypeface(null, typeface)
+                is Button -> view.setTypeface(null, typeface)
+                is EditText -> view.setTypeface(null, typeface)
+            }
+        }
+    }
+
+    fun setViewMargin(viewId: Int, left: Int, top: Int, right: Int, bottom: Int) {
+        runOnUiThread {
+            val view = viewMap[viewId] ?: return@runOnUiThread
+            val l = dpToPx(left)
+            val t = dpToPx(top)
+            val r = dpToPx(right)
+            val b = dpToPx(bottom)
+
+            val params = view.layoutParams
+            if (params is ViewGroup.MarginLayoutParams) {
+                params.setMargins(l, t, r, b)
+                view.layoutParams = params
+            }
+        }
+    }
+
+    fun setViewGravity(viewId: Int, gravity: Int) {
+        runOnUiThread {
+            val view = viewMap[viewId]
+
+            val androidGravity = when(gravity) {
+                1 -> Gravity.CENTER
+                2 -> Gravity.LEFT or Gravity.CENTER_VERTICAL
+                3 -> Gravity.RIGHT or Gravity.CENTER_VERTICAL
+                4 -> Gravity.TOP or Gravity.CENTER_HORIZONTAL
+                5 -> Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL
+                6 -> Gravity.LEFT or Gravity.TOP
+                7 -> Gravity.RIGHT or Gravity.TOP
+                8 -> Gravity.LEFT or Gravity.BOTTOM
+                9 -> Gravity.RIGHT or Gravity.BOTTOM
+                else -> Gravity.NO_GRAVITY
+            }
+
+            when (view) {
+                is TextView -> view.gravity = androidGravity
+                is Button -> view.gravity = androidGravity
+                is EditText -> view.gravity = androidGravity
+                is LinearLayout -> view.gravity = androidGravity
+            }
+        }
+    }
+
+    fun setViewElevation(viewId: Int, elevation: Int) {
+        runOnUiThread {
+            viewMap[viewId]?.elevation = dpToPx(elevation).toFloat()
+        }
+    }
+
+    fun setViewCornerRadius(viewId: Int, radius: Int) {
+        runOnUiThread {
+            val view = viewMap[viewId]
+            val radiusPx = dpToPx(radius).toFloat()
+
+            // For CardView, update the actual card
+            val cardView = viewMap[viewId + 2000000]
+            if (cardView is CardView) {
+                cardView.radius = radiusPx
+            } else if (view != null) {
+                // For other views, use a rounded background
+                val drawable = GradientDrawable()
+                drawable.cornerRadius = radiusPx
+                drawable.setColor(Color.TRANSPARENT)
+                view.background = drawable
+            }
+        }
+    }
+
+    fun setViewBorder(viewId: Int, width: Int, color: Int) {
+        runOnUiThread {
+            val view = viewMap[viewId] ?: return@runOnUiThread
+            val widthPx = dpToPx(width)
+
+            val drawable = GradientDrawable()
+            drawable.setStroke(widthPx, color)
+
+            // Preserve existing background color if any
+            if (view.background is ColorDrawable) {
+                val bgColor = (view.background as ColorDrawable).color
+                drawable.setColor(bgColor)
+            }
+
+            view.background = drawable
+        }
+    }
+
+    fun httpGet(url: String, callbackId: Int, headersJson: String) {
+        Thread {
+            try {
+                val connection = URL(url).openConnection() as HttpURLConnection
+                connection.requestMethod = "GET"
+                connection.connectTimeout = 15000
+                connection.readTimeout = 15000
+
+                // Parse and add headers
+                if (headersJson.isNotEmpty()) {
+                    parseAndAddHeaders(connection, headersJson)
+                }
+
+                val statusCode = connection.responseCode
+                val response = if (statusCode in 200..299) {
+                    connection.inputStream.bufferedReader().use { it.readText() }
+                } else {
+                    connection.errorStream?.bufferedReader()?.use { it.readText() } ?: ""
+                }
+
+                connection.disconnect()
+                onHttpResponse(callbackId, statusCode in 200..299, response, statusCode)
+
+            } catch (e: Exception) {
+                Log.e(TAG, "HTTP GET error: ${e.message}", e)
+                onHttpResponse(callbackId, false, "Error: ${e.message}", 0)
+            }
+        }.start()
+    }
+
+    fun httpPost(url: String, body: String, callbackId: Int, headersJson: String) {
+        Thread {
+            try {
+                val connection = URL(url).openConnection() as HttpURLConnection
+                connection.requestMethod = "POST"
+                connection.connectTimeout = 15000
+                connection.readTimeout = 15000
+                connection.doOutput = true
+
+                // Set default content type if not provided
+                var hasContentType = false
+                if (headersJson.isNotEmpty()) {
+                    hasContentType = parseAndAddHeaders(connection, headersJson)
+                }
+                if (!hasContentType) {
+                    connection.setRequestProperty("Content-Type", "application/json")
+                }
+
+                // Write body
+                connection.outputStream.use { os ->
+                    os.write(body.toByteArray())
+                    os.flush()
+                }
+
+                val statusCode = connection.responseCode
+                val response = if (statusCode in 200..299) {
+                    connection.inputStream.bufferedReader().use { it.readText() }
+                } else {
+                    connection.errorStream?.bufferedReader()?.use { it.readText() } ?: ""
+                }
+
+                connection.disconnect()
+                onHttpResponse(callbackId, statusCode in 200..299, response, statusCode)
+
+            } catch (e: Exception) {
+                Log.e(TAG, "HTTP POST error: ${e.message}", e)
+                onHttpResponse(callbackId, false, "Error: ${e.message}", 0)
+            }
+        }.start()
+    }
+
+    fun httpPut(url: String, body: String, callbackId: Int, headersJson: String) {
+        Thread {
+            try {
+                val connection = URL(url).openConnection() as HttpURLConnection
+                connection.requestMethod = "PUT"
+                connection.connectTimeout = 15000
+                connection.readTimeout = 15000
+                connection.doOutput = true
+
+                var hasContentType = false
+                if (headersJson.isNotEmpty()) {
+                    hasContentType = parseAndAddHeaders(connection, headersJson)
+                }
+                if (!hasContentType) {
+                    connection.setRequestProperty("Content-Type", "application/json")
+                }
+
+                connection.outputStream.use { os ->
+                    os.write(body.toByteArray())
+                    os.flush()
+                }
+
+                val statusCode = connection.responseCode
+                val response = if (statusCode in 200..299) {
+                    connection.inputStream.bufferedReader().use { it.readText() }
+                } else {
+                    connection.errorStream?.bufferedReader()?.use { it.readText() } ?: ""
+                }
+
+                connection.disconnect()
+                onHttpResponse(callbackId, statusCode in 200..299, response, statusCode)
+
+            } catch (e: Exception) {
+                Log.e(TAG, "HTTP PUT error: ${e.message}", e)
+                onHttpResponse(callbackId, false, "Error: ${e.message}", 0)
+            }
+        }.start()
+    }
+
+    fun httpDelete(url: String, callbackId: Int, headersJson: String) {
+        Thread {
+            try {
+                val connection = URL(url).openConnection() as HttpURLConnection
+                connection.requestMethod = "DELETE"
+                connection.connectTimeout = 15000
+                connection.readTimeout = 15000
+
+                if (headersJson.isNotEmpty()) {
+                    parseAndAddHeaders(connection, headersJson)
+                }
+
+                val statusCode = connection.responseCode
+                val response = if (statusCode in 200..299) {
+                    connection.inputStream.bufferedReader().use { it.readText() }
+                } else {
+                    connection.errorStream?.bufferedReader()?.use { it.readText() } ?: ""
+                }
+
+                connection.disconnect()
+                onHttpResponse(callbackId, statusCode in 200..299, response, statusCode)
+
+            } catch (e: Exception) {
+                Log.e(TAG, "HTTP DELETE error: ${e.message}", e)
+                onHttpResponse(callbackId, false, "Error: ${e.message}", 0)
+            }
+        }.start()
+    }
+
+    private fun parseAndAddHeaders(connection: HttpURLConnection, headersJson: String): Boolean {
+        var hasContentType = false
+        try {
+            // Simple JSON parsing for headers (format: {"key":"value","key2":"value2"})
+            val cleanJson = headersJson.trim().removeSurrounding("{", "}")
+            if (cleanJson.isEmpty()) return false
+
+            cleanJson.split(",").forEach { pair ->
+                val parts = pair.split(":")
+                if (parts.size == 2) {
+                    val key = parts[0].trim().removeSurrounding("\"")
+                    val value = parts[1].trim().removeSurrounding("\"")
+                    connection.setRequestProperty(key, value)
+                    if (key.equals("Content-Type", ignoreCase = true)) {
+                        hasContentType = true
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error parsing headers: ${e.message}")
+        }
+        return hasContentType
+    }
+
+
     override fun onDestroy() {
         super.onDestroy()
         DropletVM().cleanup()
@@ -481,6 +851,7 @@ class MainActivity : AppCompatActivity() {
 
     private external fun registerVM()
     private external fun onButtonClick(callbackId: Int)
+    private external fun onHttpResponse(callbackId: Int, success: Boolean, response: String, statusCode: Int)
 }
 
 class SimpleRecyclerAdapter : RecyclerView.Adapter<SimpleRecyclerAdapter.ViewHolder>() {
