@@ -53,6 +53,7 @@ void android_create_screen(VM& vm, const uint8_t argc);
 void android_navigate_to_screen(VM& vm, const uint8_t argc);
 void android_navigate_back(VM& vm, const uint8_t argc);
 void android_set_back_button_visible(VM& vm, const uint8_t argc);
+void android_clear_screen(VM& vm, const uint8_t argc);
 
 // HTTP Functions
 void android_http_get(VM& vm, const uint8_t argc);
@@ -105,6 +106,7 @@ inline void register_android_native_functions(VM& vm) {
     vm.register_native("android_navigate_to_screen", android_navigate_to_screen);
     vm.register_native("android_navigate_back", android_navigate_back);
     vm.register_native("android_set_back_button_visible", android_set_back_button_visible);
+    vm.register_native("android_clear_screen", android_clear_screen);
 
     // HTTP Functions
     vm.register_native("android_http_get", android_http_get);

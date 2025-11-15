@@ -1304,4 +1304,25 @@ Java_com_mist_example_MainActivity_onHttpResponse(JNIEnv* env, jobject thiz,
     }
 }
 
+void android_clear_screen(VM& vm, const uint8_t argc) {
+    if (argc < 1) {
+        for (int i = 0; i < argc; i++) vm.stack_manager.pop();
+        vm.stack_manager.push(Value::createNIL());
+        return;
+    }
+
+    Value screenIdVal = vm.stack_manager.pop();
+    for (int i = 1; i < argc; i++) vm.stack_manager.pop();
+
+    int screenId = (screenIdVal.type == ValueType::INT) ? screenIdVal.current_value.i : -1;
+
+    JNIEnv* env;
+    droplet_java_vm->AttachCurrentThread(&env, nullptr);
+
+    jclass cls = env->GetObjectClass(droplet_activity);
+    jmethodID method = env->GetMethodID(cls, "clearScreen", "(I)V");
+    env->CallVoidMethod(droplet_activity, method, screenId);
+
+    vm.stack_manager.push(Value::createNIL());
+}
 #endif

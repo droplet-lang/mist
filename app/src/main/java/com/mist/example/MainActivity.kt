@@ -843,6 +843,21 @@ class MainActivity : AppCompatActivity() {
         return hasContentType
     }
 
+    fun clearScreen(screenId: Int) {
+        runOnUiThread {
+            Log.d(TAG, "Clearing screen: $screenId")
+            val screen = screenMap[screenId]
+            if (screen == null) {
+                Log.e(TAG, "Screen not found: $screenId")
+                return@runOnUiThread
+            }
+
+            // Remove all child views from the screen's container
+            screen.container.removeAllViews()
+            Log.d(TAG, "Screen $screenId cleared successfully")
+        }
+    }
+
 
     override fun onDestroy() {
         super.onDestroy()
