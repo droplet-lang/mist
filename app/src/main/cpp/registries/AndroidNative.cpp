@@ -32,6 +32,7 @@ void push_int_to_vm_stack(VM& vm, int n) {
 struct CallbackInfo {
     Value callback;  // Store the actual callback object (ObjBoundMethod or ObjFunction)
     Object* gcRoot;     // Keep a direct pointer to prevent GC
+    int userData; // ADD THIS - stores the index or any custom int
 };
 
 static std::unordered_map<int, CallbackInfo> g_callbacks;
@@ -70,6 +71,8 @@ void android_native_toast(VM& vm, const uint8_t argc) {
     vm.stack_manager.push(Value::createNIL());
 }
 
+// Replace your existing android_create_button and onButtonClick functions with these:
+
 void android_create_button(VM& vm, const uint8_t argc) {
     __android_log_print(ANDROID_LOG_INFO, LOG_TAG, "create_button called with argc: %d", argc);
 
@@ -81,6 +84,13 @@ void android_create_button(VM& vm, const uint8_t argc) {
     }
 
     // Pop arguments in reverse order (last pushed = first popped)
+    int userData = -1;
+    if (argc >= 4) {
+        Value userDataVal = vm.stack_manager.pop();
+        userData = (userDataVal.type == ValueType::INT) ? userDataVal.current_value.i : -1;
+        __android_log_print(ANDROID_LOG_INFO, LOG_TAG, "Button userData: %d", userData);
+    }
+
     int parentId = -1;
     if (argc >= 3) {
         Value parent = vm.stack_manager.pop();
@@ -91,17 +101,18 @@ void android_create_button(VM& vm, const uint8_t argc) {
     Value title = vm.stack_manager.pop();
 
     // Pop any extra arguments
-    for (int i = 3; i < argc; i++) {
+    for (int i = 4; i < argc; i++) {
         vm.stack_manager.pop();
     }
 
-    __android_log_print(ANDROID_LOG_INFO, LOG_TAG, "Button: %s, Callback type: %d, ParentId: %d",
-                        title.toString().c_str(), static_cast<int>(callback.type), parentId);
+    __android_log_print(ANDROID_LOG_INFO, LOG_TAG, "Button: %s, Callback type: %d, ParentId: %d, UserData: %d",
+                        title.toString().c_str(), static_cast<int>(callback.type), parentId, userData);
 
-    // Store callback info
+    // Store callback info WITH userData
     int callbackId = g_next_callback_id++;
     CallbackInfo info;
     info.callback = callback;
+    info.userData = userData;  // STORE THE USER DATA
 
     if (callback.type == ValueType::OBJECT && callback.current_value.object) {
         info.gcRoot = callback.current_value.object;
@@ -114,21 +125,18 @@ void android_create_button(VM& vm, const uint8_t argc) {
 
     g_callbacks[callbackId] = info;
 
-    // Don't generate a buttonId - let Java handle it
-    __android_log_print(ANDROID_LOG_INFO, LOG_TAG, "Created callback ID: %d", callbackId);
+    __android_log_print(ANDROID_LOG_INFO, LOG_TAG, "Created callback ID: %d with userData: %d", callbackId, userData);
 
     JNIEnv* env;
     droplet_java_vm->AttachCurrentThread(&env, nullptr);
 
     jclass cls = env->GetObjectClass(droplet_activity);
-    // Use the original 3-parameter signature
     jmethodID method = env->GetMethodID(cls, "createButton", "(Ljava/lang/String;II)V");
 
     jstring jtitle = env->NewStringUTF(title.toString().c_str());
     env->CallVoidMethod(droplet_activity, method, jtitle, callbackId, parentId);
     env->DeleteLocalRef(jtitle);
 
-    // Return NIL since we don't need the button ID in Droplet
     vm.stack_manager.push(Value::createNIL());
 }
 
@@ -156,8 +164,10 @@ Java_com_mist_example_MainActivity_onButtonClick(JNIEnv* env, jobject thiz, jint
 
     CallbackInfo& info = it->second;
     Value callback = info.callback;
+    int userData = info.userData;
 
-    __android_log_print(ANDROID_LOG_INFO, LOG_TAG, "Found callback, type: %d", static_cast<int>(callback.type));
+    __android_log_print(ANDROID_LOG_INFO, LOG_TAG, "Found callback, type: %d, userData: %d",
+                        static_cast<int>(callback.type), userData);
 
     // Log what we're about to execute
     if (callback.type == ValueType::OBJECT && callback.current_value.object) {
@@ -198,8 +208,12 @@ Java_com_mist_example_MainActivity_onButtonClick(JNIEnv* env, jobject thiz, jint
             __android_log_print(ANDROID_LOG_ERROR, LOG_TAG, "Callback is not an object or is null!");
         }
 
-        // Use the new execute_callback method
-        std::vector<Value> args; // No additional arguments for button clicks
+        // Create arguments vector with userData if it exists
+        std::vector<Value> args;
+        if (userData != -1) {
+            args.push_back(Value::createINT(userData));
+            __android_log_print(ANDROID_LOG_INFO, LOG_TAG, "Passing userData %d to callback", userData);
+        }
 
         bool success = g_vm_instance->execute_callback(callback, args);
 
@@ -1035,6 +1049,8 @@ void android_set_view_border(VM& vm, const uint8_t argc) {
 // HTTP FUNCTIONS
 // ============================================
 
+// Replace your HTTP functions with these fixed versions that properly initialize userData
+
 // HTTP GET: android_http_get(url, callback, headers_optional)
 void android_http_get(VM& vm, const uint8_t argc) {
     if (argc < 2) {
@@ -1060,6 +1076,7 @@ void android_http_get(VM& vm, const uint8_t argc) {
 
     CallbackInfo info;
     info.callback = callback;
+    info.userData = -1;  // INITIALIZE userData for HTTP callbacks
     if (callback.type == ValueType::OBJECT && callback.current_value.object) {
         info.gcRoot = callback.current_value.object;
         g_callback_gc_roots.push_back(callback.current_value.object);
@@ -1108,6 +1125,7 @@ void android_http_post(VM& vm, const uint8_t argc) {
 
     CallbackInfo info;
     info.callback = callback;
+    info.userData = -1;  // INITIALIZE userData
     if (callback.type == ValueType::OBJECT && callback.current_value.object) {
         info.gcRoot = callback.current_value.object;
         g_callback_gc_roots.push_back(callback.current_value.object);
@@ -1158,6 +1176,7 @@ void android_http_put(VM& vm, const uint8_t argc) {
 
     CallbackInfo info;
     info.callback = callback;
+    info.userData = -1;  // INITIALIZE userData
     if (callback.type == ValueType::OBJECT && callback.current_value.object) {
         info.gcRoot = callback.current_value.object;
         g_callback_gc_roots.push_back(callback.current_value.object);
@@ -1206,6 +1225,7 @@ void android_http_delete(VM& vm, const uint8_t argc) {
 
     CallbackInfo info;
     info.callback = callback;
+    info.userData = -1;  // INITIALIZE userData
     if (callback.type == ValueType::OBJECT && callback.current_value.object) {
         info.gcRoot = callback.current_value.object;
         g_callback_gc_roots.push_back(callback.current_value.object);
